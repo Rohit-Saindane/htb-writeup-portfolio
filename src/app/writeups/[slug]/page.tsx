@@ -80,7 +80,7 @@ export default function WriteupDetailPage({ params }: PageProps) {
           </Link>
           
           <a
-            href={`https://github.com/Rohit-Saindane/HTB-Writeups/blob/main/${metadata.filePath}`}
+            href={`https://github.com/Rohit-Saindane/HTB-Writeups/blob/main/${metadata.githubPath}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs font-mono font-bold text-muted-foreground hover:text-accent flex items-center gap-1.5 theme-transition cursor-pointer"

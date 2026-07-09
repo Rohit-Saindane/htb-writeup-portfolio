@@ -16,6 +16,7 @@ export interface WriteupMetadata {
   slug: string;       // e.g. 'garfield'
   seasonSlug: string; // e.g. 'season-10'
   filePath: string;
+  githubPath: string;
   readingTime: number;
 }
 
@@ -80,6 +81,7 @@ export function getAllWriteups(): WriteupMetadata[] {
       slug: machineSlug,
       seasonSlug,
       filePath: path.relative(process.cwd(), filePath).replace(/\\/g, '/'),
+      githubPath: getGithubWriteupPath(seasonSlug, machineSlug),
       readingTime,
     };
   });
@@ -182,4 +184,36 @@ export function getFilterOptions(): FilterOptions {
     os,
     difficulties
   };
+}
+
+export function getGithubWriteupPath(seasonSlug: string, slug: string): string {
+  const map: Record<string, Record<string, string>> = {
+    "season-9-release-arena": {
+      "airtouch": "Season-9&Release-arena/AirTouch.md",
+      "browsed": "Season-9&Release-arena/Browsed.md",
+      "eloquia": "Season-9&Release-arena/ELOUIA NOTES FROM-admin-panel.md",
+      "overwatch": "Season-9&Release-arena/Overwatch.md"
+    },
+    "season-10": {
+      "cctv": "Season-10/cctv.md",
+      "devarea": "Season-10/DevArea.md",
+      "facts": "Season-10/Facts.md",
+      "garfield": "Season-10/Garfield.md",
+      "interpreter": "Season-10/Interpreter.md",
+      "kobold": "Season-10/Kobold.md",
+      "logging": "Season-10/Logging.md",
+      "pirate": "Season-10/Pirate.md",
+      "silentium": "Season-10/Silentium.md",
+      "variatype": "Season-10/VariaType.md",
+      "wingdata": "Season-10/WingData.md"
+    }
+  };
+
+  const pathResult = map[seasonSlug]?.[slug];
+  if (pathResult) return pathResult;
+
+  // Fallback default logic if not in map
+  const folder = seasonSlug === "season-9-release-arena" ? "Season-9&Release-arena" : "Season-10";
+  const capitalName = slug.charAt(0).toUpperCase() + slug.slice(1);
+  return `${folder}/${capitalName}.md`;
 }
