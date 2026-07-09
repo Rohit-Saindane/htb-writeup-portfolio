@@ -24,7 +24,13 @@ export default function WriteupCard({ writeup, index }: WriteupCardProps) {
 
   const difficultyColor = difficultyColors[writeup.difficulty] || difficultyColors.easy;
 
-
+  const accentGradients = {
+    easy: "from-green-500/20 to-transparent",
+    medium: "from-amber-500/20 to-transparent",
+    hard: "from-orange-500/20 to-transparent",
+    insane: "from-purple-500/20 to-transparent",
+  };
+  const accentGradient = accentGradients[writeup.difficulty] || accentGradients.easy;
 
   return (
     <motion.div
@@ -35,6 +41,9 @@ export default function WriteupCard({ writeup, index }: WriteupCardProps) {
       className="group relative bg-card rounded-xl border border-border hover:border-accent/40 shadow-sm hover:shadow-glow theme-transition overflow-hidden flex flex-col h-full cursor-pointer"
       id={`writeup-card-${writeup.slug}`}
     >
+      {/* Visual Accent glow line */}
+      <div className={`absolute top-0 left-0 w-full h-[2.5px] bg-gradient-to-r ${accentGradient} group-hover:from-accent group-hover:to-accent/30 theme-transition duration-300`} />
+
       <Link href={`/writeups/${writeup.slug}`} className="flex flex-col h-full p-5 justify-between">
         <div>
           {/* Card Top: OS & Difficulty Badges */}
@@ -53,15 +62,17 @@ export default function WriteupCard({ writeup, index }: WriteupCardProps) {
           </div>
 
           {/* Title with Logo */}
-          <div className="flex items-center gap-2.5 mb-2">
-            <img
-              src={`/images/machines/${writeup.slug}.png`}
-              alt={`${writeup.title} logo`}
-              className="w-9 h-9 rounded-full object-contain flex-shrink-0"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
+          <div className="flex items-center gap-2.5 mb-2.5">
+            <div className="w-10 h-10 rounded-full border border-border/80 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 group-hover:border-accent/30 theme-transition overflow-hidden flex-shrink-0">
+              <img
+                src={`/images/machines/${writeup.slug}.png`}
+                alt={`${writeup.title} logo`}
+                className="w-full h-full rounded-full object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+            </div>
             <h3 className="text-lg font-bold font-mono text-foreground group-hover:text-accent theme-transition">
               {writeup.title}
             </h3>
@@ -92,11 +103,11 @@ export default function WriteupCard({ writeup, index }: WriteupCardProps) {
           </div>
 
           {/* Card Footer Info */}
-          <div className="pt-4 border-t border-border flex items-center justify-between text-xs font-mono text-muted-foreground">
+          <div className="pt-4 border-t border-border flex items-center justify-between text-[11px] font-mono text-muted-foreground">
             <span className="truncate max-w-[120px]">{writeup.season}</span>
+            <span className="hidden sm:inline opacity-60">{writeup.date}</span>
             <div className="flex items-center gap-3">
-
-              <span className="flex items-center gap-1 text-accent">
+              <span className="flex items-center gap-1 text-accent font-bold">
                 <Award className="w-3.5 h-3.5" />
                 {writeup.pointsAwarded} pts
               </span>

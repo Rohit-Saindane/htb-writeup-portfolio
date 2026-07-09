@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, RotateCcw, AlertTriangle } from "lucide-react";
+import { Search, RotateCcw, AlertTriangle, SlidersHorizontal, Hash } from "lucide-react";
 import WriteupCard from "@/components/WriteupCard";
 import { WriteupMetadata, FilterOptions } from "@/lib/mdx";
 
@@ -54,33 +54,36 @@ export default function WriteupsCatalog({ writeups, filterOptions }: WriteupsCat
   }, [writeups, searchQuery, selectedSeason, selectedOS, selectedDifficulty, selectedTag]);
 
   return (
-    <div className="w-full min-h-screen bg-background text-foreground py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="w-full min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+      {/* Background decoration grid lines */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:5rem_5rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-30 pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto relative z-10">
         
         {/* Catalog Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10 border-b border-border/60 pb-6">
           <div>
             <h1 className="text-3xl font-bold font-mono tracking-tight text-foreground flex items-center gap-2">
               <span className="text-accent">&gt;_</span>
               <span>All Writeups</span>
             </h1>
-            <p className="text-sm font-sans text-muted-foreground mt-1.5">
+            <p className="text-sm font-sans text-muted-foreground mt-1.5 leading-relaxed">
               Explore walkthroughs, nmap scans, and privilege escalation vectors for {writeups.length} lab machines.
             </p>
           </div>
           
           {/* Active Results Count & Reset button */}
-          <div className="flex items-center gap-3 text-xs font-mono">
-            <span className="text-muted-foreground">
-              Showing {filteredWriteups.length} of {writeups.length} machines
+          <div className="flex items-center gap-4 text-xs font-mono">
+            <span className="text-muted-foreground bg-black/10 dark:bg-white/5 border border-border px-3 py-1 rounded-lg">
+              Showing <strong className="text-foreground">{filteredWriteups.length}</strong> of {writeups.length} machines
             </span>
             {(searchQuery || selectedSeason !== "all" || selectedOS !== "all" || selectedDifficulty !== "all" || selectedTag !== "all") && (
               <button
                 onClick={resetFilters}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent/10 border border-accent/20 text-accent hover:bg-accent hover:text-background theme-transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-accent/10 border border-accent/20 text-accent hover:bg-accent hover:text-background hover:shadow-glow theme-transition cursor-pointer"
                 id="reset-filters-btn"
               >
-                <RotateCcw className="w-3 h-3" />
+                <RotateCcw className="w-3.5 h-3.5" />
                 <span>Reset Filters</span>
               </button>
             )}
@@ -88,14 +91,14 @@ export default function WriteupsCatalog({ writeups, filterOptions }: WriteupsCat
         </div>
 
         {/* Search Bar Input */}
-        <div className="relative mb-10 max-w-2xl">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+        <div className="relative mb-10 max-w-3xl group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-accent theme-transition" />
           <input
             type="text"
             placeholder="Search by machine name, tags, or vulnerability description..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-xl bg-card border border-border focus:border-accent/40 focus:outline-none font-sans text-foreground theme-transition shadow-sm"
+            className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-card border border-border focus:border-accent/40 focus:outline-none focus:shadow-glow font-sans text-foreground theme-transition shadow-sm"
             id="writeups-search-input"
           />
         </div>
@@ -104,30 +107,43 @@ export default function WriteupsCatalog({ writeups, filterOptions }: WriteupsCat
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
           
           {/* Filter Sidebar Column */}
-          <div className="flex flex-col gap-6 lg:col-span-1 bg-card border border-border rounded-xl p-5 shadow-sm">
+          <div className="flex flex-col gap-6 lg:col-span-1 bg-card/65 backdrop-blur-md border border-border/80 rounded-xl p-5 shadow-sm relative overflow-hidden group">
+            {/* Ambient top glowing line */}
+            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-accent/10 to-transparent group-hover:via-accent/40 theme-transition" />
+            
+            <div className="flex items-center gap-2 border-b border-border/60 pb-3 mb-1">
+              <SlidersHorizontal className="w-4 h-4 text-accent" />
+              <span className="text-sm font-mono font-bold text-foreground">Filters</span>
+            </div>
+
             {/* Filter Section: Season */}
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground">
                 Season
               </span>
-              <select
-                value={selectedSeason}
-                onChange={(e) => setSelectedSeason(e.target.value)}
-                className="w-full p-2.5 rounded-lg bg-background border border-border font-mono text-sm focus:outline-none focus:border-accent/40 text-foreground cursor-pointer"
-                id="filter-season-select"
-              >
-                <option value="all">All Seasons</option>
-                {filterOptions.seasons.map((s) => (
-                  <option key={s.slug} value={s.slug}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={selectedSeason}
+                  onChange={(e) => setSelectedSeason(e.target.value)}
+                  className="w-full p-2.5 rounded-lg bg-background border border-border font-mono text-sm focus:outline-none focus:border-accent/30 text-foreground cursor-pointer appearance-none theme-transition hover:border-border-hover"
+                  id="filter-season-select"
+                >
+                  <option value="all">All Seasons</option>
+                  {filterOptions.seasons.map((s) => (
+                    <option key={s.slug} value={s.slug}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">
+                  ▼
+                </div>
+              </div>
             </div>
 
             {/* Filter Section: OS */}
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground">
                 Operating System
               </span>
               <div className="grid grid-cols-3 gap-2">
@@ -135,10 +151,10 @@ export default function WriteupsCatalog({ writeups, filterOptions }: WriteupsCat
                   <button
                     key={os}
                     onClick={() => setSelectedOS(os)}
-                    className={`py-1.5 px-2 rounded-lg border font-mono text-xs capitalize theme-transition cursor-pointer text-center ${
+                    className={`py-2 px-1 rounded-lg border font-mono text-xs capitalize theme-transition cursor-pointer text-center ${
                       selectedOS === os
-                        ? "bg-accent/15 border-accent text-accent"
-                        : "bg-background border-border text-muted-foreground hover:text-foreground"
+                        ? "bg-accent/15 border-accent text-accent shadow-[0_0_10px_rgba(34,197,94,0.1)]"
+                        : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-accent/20"
                     }`}
                     id={`filter-os-btn-${os}`}
                   >
@@ -150,7 +166,7 @@ export default function WriteupsCatalog({ writeups, filterOptions }: WriteupsCat
 
             {/* Filter Section: Difficulty */}
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground">
                 Difficulty
               </span>
               <div className="grid grid-cols-2 gap-2">
@@ -158,10 +174,10 @@ export default function WriteupsCatalog({ writeups, filterOptions }: WriteupsCat
                   <button
                     key={diff}
                     onClick={() => setSelectedDifficulty(diff)}
-                    className={`py-1.5 px-2 rounded-lg border font-mono text-xs capitalize theme-transition cursor-pointer text-center ${
+                    className={`py-2 px-2 rounded-lg border font-mono text-xs capitalize theme-transition cursor-pointer text-center ${
                       selectedDifficulty === diff
-                        ? "bg-accent/15 border-accent text-accent"
-                        : "bg-background border-border text-muted-foreground hover:text-foreground"
+                        ? "bg-accent/15 border-accent text-accent shadow-[0_0_10px_rgba(34,197,94,0.1)]"
+                        : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-accent/20"
                     }`}
                     id={`filter-diff-btn-${diff}`}
                   >
@@ -173,33 +189,35 @@ export default function WriteupsCatalog({ writeups, filterOptions }: WriteupsCat
 
             {/* Filter Section: Tags */}
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground mb-1">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground mb-1">
                 Popular Tags
               </span>
               <div className="flex flex-wrap gap-1.5">
                 <button
                   onClick={() => setSelectedTag("all")}
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded border theme-transition cursor-pointer ${
+                  className={`text-[10px] font-mono px-2 py-1 rounded-md border theme-transition cursor-pointer flex items-center gap-0.5 ${
                     selectedTag === "all"
-                      ? "bg-accent/20 border-accent text-accent"
-                      : "bg-background border-border text-muted-foreground hover:text-foreground"
+                      ? "bg-accent/20 border-accent text-accent shadow-[0_0_10px_rgba(34,197,94,0.1)]"
+                      : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-accent/20"
                   }`}
                   id="filter-tag-btn-all"
                 >
-                  All
+                  <Hash className="w-2.5 h-2.5" />
+                  <span>All</span>
                 </button>
                 {filterOptions.tags.slice(0, 15).map((tag) => (
                   <button
                     key={tag}
                     onClick={() => setSelectedTag(tag)}
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded border theme-transition cursor-pointer ${
+                    className={`text-[10px] font-mono px-2 py-1 rounded-md border theme-transition cursor-pointer flex items-center gap-0.5 ${
                       selectedTag === tag
-                        ? "bg-accent/20 border-accent text-accent"
-                        : "bg-background border-border text-muted-foreground hover:text-foreground"
+                        ? "bg-accent/20 border-accent text-accent shadow-[0_0_10px_rgba(34,197,94,0.1)]"
+                      : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-accent/20"
                     }`}
                     id={`filter-tag-btn-${tag.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
                   >
-                    {tag}
+                    <Hash className="w-2.5 h-2.5" />
+                    <span>{tag}</span>
                   </button>
                 ))}
               </div>
@@ -224,7 +242,7 @@ export default function WriteupsCatalog({ writeups, filterOptions }: WriteupsCat
                 </p>
                 <button
                   onClick={resetFilters}
-                  className="mt-6 px-4 py-2 rounded-lg bg-accent text-background font-mono text-sm font-semibold hover:bg-accent-hover theme-transition cursor-pointer"
+                  className="mt-6 px-4 py-2 rounded-lg bg-accent text-background font-mono text-sm font-semibold hover:bg-accent-hover hover:shadow-glow theme-transition cursor-pointer"
                   id="empty-reset-filters-btn"
                 >
                   Clear Filters
