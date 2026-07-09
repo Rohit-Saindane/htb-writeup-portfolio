@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Terminal, Cpu, Radar, Shield, Zap, Code2, GitBranch, Activity } from "lucide-react";
+import { ArrowRight, Terminal, Cpu, Radar, Shield, Zap, Code2, GitBranch, Activity, Key, Network } from "lucide-react";
 import HtbStatsCard from "@/components/HtbStatsCard";
 import WriteupCard from "@/components/WriteupCard";
 import { getAllWriteups } from "@/lib/mdx";
@@ -16,7 +16,7 @@ const toolsList = [
   {
     name: "Burp Suite",
     category: "Web App Proxy",
-    description: "Proxy intercept, web request tampering, repeater, and automated scanner tests.",
+    description: "Proxy intercept, web request tampering, repeater, intruder, and automated scanner tests.",
     icon: Shield,
     colorClass: "text-orange-400 group-hover:text-orange-500",
     hoverBorder: "hover:border-orange-500/40"
@@ -30,7 +30,7 @@ const toolsList = [
     hoverBorder: "hover:border-red-500/40"
   },
   {
-    name: "Python",
+    name: "Python & Bash",
     category: "Exploit Dev",
     description: "Writing custom scripts, automating payload delivery, and modifying proof-of-concepts.",
     icon: Code2,
@@ -52,6 +52,30 @@ const toolsList = [
     icon: Activity,
     colorClass: "text-cyan-400 group-hover:text-cyan-500",
     hoverBorder: "hover:border-cyan-500/40"
+  },
+  {
+    name: "Mimikatz & Rubeus",
+    category: "AD Exploitation",
+    description: "LSASS dumping, ticket extraction, Pass-the-Hash (PtH), and Kerberos ticket attacks.",
+    icon: Key,
+    colorClass: "text-emerald-400 group-hover:text-emerald-500",
+    hoverBorder: "hover:border-emerald-500/40"
+  },
+  {
+    name: "Chisel & Proxychains",
+    category: "Pivoting & Tunneling",
+    description: "Local/remote port forwarding, SOCKS proxy tunneling, and traversing firewall barriers.",
+    icon: Network,
+    colorClass: "text-pink-400 group-hover:text-pink-500",
+    hoverBorder: "hover:border-pink-500/40"
+  },
+  {
+    name: "Hashcat & John",
+    category: "Password Cracking",
+    description: "GPU-accelerated hash cracking, custom rule file creation, and credential recovery.",
+    icon: Cpu,
+    colorClass: "text-rose-400 group-hover:text-rose-500",
+    hoverBorder: "hover:border-rose-500/40"
   }
 ];
 

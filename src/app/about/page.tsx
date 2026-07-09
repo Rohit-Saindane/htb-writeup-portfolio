@@ -1,4 +1,4 @@
-import { Shield, FileText, Code2, GraduationCap, Server, Contact, Radar, Zap, GitBranch, Activity, Key, ShieldAlert, Terminal, Cpu } from "lucide-react";
+import { Shield, FileText, Code2, GraduationCap, Server, Contact, Radar, Zap, GitBranch, Activity, Key, ShieldAlert, Terminal, Cpu, Network } from "lucide-react";
 
 export const metadata = {
   title: "About Me | Rohit Saindane",
@@ -14,6 +14,8 @@ const toolkitList = [
   { name: "Wireshark", category: "Packet & Protocol", icon: Activity, color: "text-cyan-400" },
   { name: "Mimikatz", category: "Credential Dumping", icon: Key, color: "text-emerald-400" },
   { name: "Rubeus", category: "Kerberos Attacks", icon: ShieldAlert, color: "text-rose-400" },
+  { name: "Chisel / Proxychains", category: "Pivoting & Tunneling", icon: Network, color: "text-pink-400" },
+  { name: "Hashcat / John", category: "Password Cracking", icon: Cpu, color: "text-rose-400" },
   { name: "Python / Bash", category: "Automation & Scripting", icon: Code2, color: "text-yellow-400" }
 ];
 
