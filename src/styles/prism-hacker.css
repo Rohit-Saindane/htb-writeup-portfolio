@@ -1,0 +1,176 @@
+/* Cyberpunk-Terminal Hacking Syntax Highlighting Theme */
+
+/* Code block wrapper (represented as a terminal pane) */
+.terminal-window {
+  margin: 1.5rem 0;
+  border-radius: 12px;
+  border: 1px border var(--border);
+  background-color: #0c0f12;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.terminal-header {
+  height: 38px;
+  padding: 0 16px;
+  background-color: #12161a;
+  border-b: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.terminal-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.terminal-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.terminal-dot.red { background-color: #ff5f56; }
+.terminal-dot.yellow { background-color: #ffbd2e; }
+.terminal-dot.green { background-color: #27c93f; }
+
+.terminal-title {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.terminal-content {
+  position: relative;
+}
+
+.terminal-pre {
+  margin: 0 !important;
+  padding: 1.25rem !important;
+  background-color: transparent !important;
+  font-family: var(--font-mono), monospace !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  overflow-x: auto !important;
+}
+
+.terminal-code {
+  font-family: var(--font-mono), monospace !important;
+  color: #e2e8f0;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+/* Copy Button styles */
+.copy-btn {
+  padding: 6px 12px;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  background-color: #1a2026;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+  color: var(--foreground);
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--border-glow);
+}
+
+.copy-btn.copied {
+  color: var(--background);
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Token Styles (Prism Compatibility) */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #5d6e80;
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: #94a3b8;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #c084fc; /* soft purple */
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #38bdf8; /* light blue/cyan */
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #2dd4bf; /* teal */
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #00e599; /* signature green */
+  font-weight: bold;
+}
+
+.token.function,
+.token.class-name {
+  color: #60a5fa; /* sky blue */
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #fb7185; /* soft rose */
+}
+
+.token.important,
+.token.bold {
+  font-weight: bold;
+}
+.token.italic {
+  font-style: italic;
+}
+
+/* Command Prompt Highlighting */
+.command-prompt {
+  color: #00e599;
+  font-weight: bold;
+  user-select: none;
+}
+
+/* Fix Shields.io/Markdown badges alignment in single inline block line */
+.mdx-content p img {
+  display: inline-block !important;
+  margin: 0.25rem !important;
+  vertical-align: middle;
+  border-radius: 4px;
+}
+
