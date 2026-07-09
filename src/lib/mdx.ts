@@ -128,6 +128,7 @@ export function getWriteupBySlug(slug: string): Writeup | null {
         slug: machineSlug,
         seasonSlug,
         filePath: path.relative(process.cwd(), filePath).replace(/\\/g, '/'),
+        githubPath: getGithubWriteupPath(seasonSlug, machineSlug),
         readingTime,
       };
 
