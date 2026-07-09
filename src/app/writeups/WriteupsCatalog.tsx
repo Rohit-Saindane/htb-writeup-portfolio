@@ -107,119 +107,121 @@ export default function WriteupsCatalog({ writeups, filterOptions }: WriteupsCat
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
           
           {/* Filter Sidebar Column */}
-          <div className="flex flex-col gap-6 lg:col-span-1 bg-card/65 backdrop-blur-md border border-border/80 rounded-xl p-5 shadow-sm relative overflow-hidden group">
-            {/* Ambient top glowing line */}
-            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-accent/10 to-transparent group-hover:via-accent/40 theme-transition" />
-            
-            <div className="flex items-center gap-2 border-b border-border/60 pb-3 mb-1">
-              <SlidersHorizontal className="w-4 h-4 text-accent" />
-              <span className="text-sm font-mono font-bold text-foreground">Filters</span>
-            </div>
+          <div className="rgb-border-wrapper lg:col-span-1 shadow-sm">
+            <div className="rgb-border-inner flex flex-col gap-6 p-5 relative overflow-hidden group">
+              {/* Ambient top glowing line */}
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-accent/10 to-transparent group-hover:via-accent/40 theme-transition" />
+              
+              <div className="flex items-center gap-2 border-b border-border/60 pb-3 mb-1">
+                <SlidersHorizontal className="w-4 h-4 text-accent" />
+                <span className="text-sm font-mono font-bold text-foreground">Filters</span>
+              </div>
 
-            {/* Filter Section: Season */}
-            <div className="flex flex-col gap-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground">
-                Season
-              </span>
-              <div className="relative">
-                <select
-                  value={selectedSeason}
-                  onChange={(e) => setSelectedSeason(e.target.value)}
-                  className="w-full p-2.5 rounded-lg bg-background border border-border font-mono text-sm focus:outline-none focus:border-accent/30 text-foreground cursor-pointer appearance-none theme-transition hover:border-border-hover"
-                  id="filter-season-select"
-                >
-                  <option value="all">All Seasons</option>
-                  {filterOptions.seasons.map((s) => (
-                    <option key={s.slug} value={s.slug}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">
-                  ▼
+              {/* Filter Section: Season */}
+              <div className="flex flex-col gap-2">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground">
+                  Season
+                </span>
+                <div className="relative">
+                  <select
+                    value={selectedSeason}
+                    onChange={(e) => setSelectedSeason(e.target.value)}
+                    className="w-full p-2.5 rounded-lg bg-background border border-border font-mono text-sm focus:outline-none focus:border-accent/30 text-foreground cursor-pointer appearance-none theme-transition hover:border-border-hover"
+                    id="filter-season-select"
+                  >
+                    <option value="all">All Seasons</option>
+                    {filterOptions.seasons.map((s) => (
+                      <option key={s.slug} value={s.slug}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">
+                    ▼
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Filter Section: OS */}
-            <div className="flex flex-col gap-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground">
-                Operating System
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                {["all", "linux", "windows"].map((os) => (
+              {/* Filter Section: OS */}
+              <div className="flex flex-col gap-2">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground">
+                  Operating System
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  {["all", "linux", "windows"].map((os) => (
+                    <button
+                      key={os}
+                      onClick={() => setSelectedOS(os)}
+                      className={`py-2 px-1 rounded-lg border font-mono text-xs capitalize theme-transition cursor-pointer text-center ${
+                        selectedOS === os
+                          ? "bg-accent/15 border-accent text-accent shadow-[0_0_10px_rgba(34,197,94,0.1)]"
+                          : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-accent/20"
+                      }`}
+                      id={`filter-os-btn-${os}`}
+                    >
+                      {os}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Filter Section: Difficulty */}
+              <div className="flex flex-col gap-2">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground">
+                  Difficulty
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {["all", "easy", "medium", "hard", "insane"].map((diff) => (
+                    <button
+                      key={diff}
+                      onClick={() => setSelectedDifficulty(diff)}
+                      className={`py-2 px-2 rounded-lg border font-mono text-xs capitalize theme-transition cursor-pointer text-center ${
+                        selectedDifficulty === diff
+                          ? "bg-accent/15 border-accent text-accent shadow-[0_0_10px_rgba(34,197,94,0.1)]"
+                          : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-accent/20"
+                      }`}
+                      id={`filter-diff-btn-${diff}`}
+                    >
+                      {diff}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Filter Section: Tags */}
+              <div className="flex flex-col gap-2">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                  Popular Tags
+                </span>
+                <div className="flex flex-wrap gap-1.5">
                   <button
-                    key={os}
-                    onClick={() => setSelectedOS(os)}
-                    className={`py-2 px-1 rounded-lg border font-mono text-xs capitalize theme-transition cursor-pointer text-center ${
-                      selectedOS === os
+                    onClick={() => setSelectedTag("all")}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono border theme-transition cursor-pointer ${
+                      selectedTag === "all"
                         ? "bg-accent/15 border-accent text-accent shadow-[0_0_10px_rgba(34,197,94,0.1)]"
                         : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-accent/20"
                     }`}
-                    id={`filter-os-btn-${os}`}
+                    id="filter-tag-btn-all"
                   >
-                    {os}
+                    <Hash className="w-3 h-3" />
+                    <span>All</span>
                   </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Filter Section: Difficulty */}
-            <div className="flex flex-col gap-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground">
-                Difficulty
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {["all", "easy", "medium", "hard", "insane"].map((diff) => (
-                  <button
-                    key={diff}
-                    onClick={() => setSelectedDifficulty(diff)}
-                    className={`py-2 px-2 rounded-lg border font-mono text-xs capitalize theme-transition cursor-pointer text-center ${
-                      selectedDifficulty === diff
-                        ? "bg-accent/15 border-accent text-accent shadow-[0_0_10px_rgba(34,197,94,0.1)]"
-                        : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-accent/20"
-                    }`}
-                    id={`filter-diff-btn-${diff}`}
-                  >
-                    {diff}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Filter Section: Tags */}
-            <div className="flex flex-col gap-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground mb-1">
-                Popular Tags
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  onClick={() => setSelectedTag("all")}
-                  className={`text-[10px] font-mono px-2 py-1 rounded-md border theme-transition cursor-pointer flex items-center gap-0.5 ${
-                    selectedTag === "all"
-                      ? "bg-accent/20 border-accent text-accent shadow-[0_0_10px_rgba(34,197,94,0.1)]"
-                      : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-accent/20"
-                  }`}
-                  id="filter-tag-btn-all"
-                >
-                  <Hash className="w-2.5 h-2.5" />
-                  <span>All</span>
-                </button>
-                {filterOptions.tags.slice(0, 15).map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => setSelectedTag(tag)}
-                    className={`text-[10px] font-mono px-2 py-1 rounded-md border theme-transition cursor-pointer flex items-center gap-0.5 ${
-                      selectedTag === tag
-                        ? "bg-accent/20 border-accent text-accent shadow-[0_0_10px_rgba(34,197,94,0.1)]"
-                      : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-accent/20"
-                    }`}
-                    id={`filter-tag-btn-${tag.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
-                  >
-                    <Hash className="w-2.5 h-2.5" />
-                    <span>{tag}</span>
-                  </button>
-                ))}
+                  {filterOptions.tags.slice(0, 15).map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => setSelectedTag(tag)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono border theme-transition cursor-pointer ${
+                        selectedTag === tag
+                          ? "bg-accent/15 border-accent text-accent shadow-[0_0_10px_rgba(34,197,94,0.1)]"
+                          : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-accent/20"
+                      }`}
+                      id={`filter-tag-btn-${tag.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                    >
+                      <Hash className="w-3 h-3" />
+                      <span>{tag}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

@@ -63,16 +63,14 @@ export default function WriteupCard({ writeup, index }: WriteupCardProps) {
 
           {/* Title with Logo */}
           <div className="flex items-center gap-2.5 mb-2.5">
-            <div className="w-10 h-10 rounded-full border border-border/80 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 group-hover:border-accent/30 theme-transition overflow-hidden flex-shrink-0">
-              <img
-                src={`/images/machines/${writeup.slug}.png`}
-                alt={`${writeup.title} logo`}
-                className="w-full h-full rounded-full object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
-            </div>
+            <img
+              src={`/images/machines/${writeup.slug}.png`}
+              alt={`${writeup.title} logo`}
+              className="w-10 h-10 rounded-full object-contain flex-shrink-0"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
             <h3 className="text-lg font-bold font-mono text-foreground group-hover:text-accent theme-transition">
               {writeup.title}
             </h3>
