@@ -126,8 +126,21 @@ export default function Home() {
             </Link>
           </div>
           
-          <div className="mt-8 text-xs font-mono text-muted-foreground">
-            {allWriteups.length} machines owned · Rank #1,420 · Season 10 active
+          <div className="mt-10 flex flex-wrap justify-center items-center gap-3 sm:gap-6 text-[10px] font-mono text-muted-foreground tracking-widest uppercase">
+            <span className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-accent/5 border border-accent/10">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+              <span className="text-accent font-semibold">STATUS: ACTIVE HUNTING</span>
+            </span>
+            <span className="hidden sm:inline text-border">|</span>
+            <span className="flex items-center gap-2">
+              <Terminal className="w-3.5 h-3.5 opacity-60" />
+              <span>ROOT FLAGS: {allWriteups.length}</span>
+            </span>
+            <span className="hidden sm:inline text-border">|</span>
+            <span className="flex items-center gap-2">
+              <Cpu className="w-3.5 h-3.5 opacity-60" />
+              <span>FOCUS: ACTIVE DIRECTORY</span>
+            </span>
           </div>
         </div>
       </section>
