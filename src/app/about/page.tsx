@@ -1,4 +1,4 @@
-import { Shield, FileText, Code2, GraduationCap, Server, Contact, Radar, Zap, GitBranch, Activity, Key, ShieldAlert } from "lucide-react";
+import { Shield, FileText, Code2, GraduationCap, Server, Contact, Radar, Zap, GitBranch, Activity, Key, ShieldAlert, Terminal, Cpu } from "lucide-react";
 
 export const metadata = {
   title: "About Me | Rohit Saindane",
@@ -39,7 +39,7 @@ export default function AboutPage() {
         {/* Bio Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-12">
           
-          {/* Left Column: Biography & Education (8 cols) */}
+          {/* Left Column: Biography, Specialties, Projects & Education (8 cols) */}
           <div className="lg:col-span-8 space-y-8">
             
             {/* Biography */}
@@ -59,6 +59,67 @@ export default function AboutPage() {
               </div>
             </div>
 
+            {/* Specialties & Lab Areas */}
+            <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+              <h2 className="text-lg font-bold font-mono text-foreground mb-4 flex items-center gap-2">
+                <Terminal className="w-5 h-5 text-accent" />
+                <span>Specialized Lab Focus Areas</span>
+              </h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Deep-diving into complex enterprise architectures, concentrating on the following offensive focus areas:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="p-3 rounded-lg bg-background border border-border flex flex-col gap-1">
+                  <span className="font-mono font-bold text-foreground flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                    Windows Exploitation
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Token manipulation, UAC bypasses, DLL hijacking, and LSASS dumping.
+                  </span>
+                </div>
+                <div className="p-3 rounded-lg bg-background border border-border flex flex-col gap-1">
+                  <span className="font-mono font-bold text-foreground flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                    Active Directory & LDAP
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    LDAP queries, Kerberoasting, Constrained Delegation, and ACL abuse.
+                  </span>
+                </div>
+                <div className="p-3 rounded-lg bg-background border border-border flex flex-col gap-1 col-span-1 sm:col-span-2">
+                  <span className="font-mono font-bold text-foreground flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                    Offensive Infrastructure & AD Attacks
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Kerberos attack vectors, service principal names abuse, and lateral domain compromise paths.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Academic Projects */}
+            <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+              <h2 className="text-lg font-bold font-mono text-foreground mb-4 flex items-center gap-2">
+                <Cpu className="w-5 h-5 text-accent" />
+                <span>Featured Projects</span>
+              </h2>
+              <div className="border border-border rounded-lg p-4 bg-background hover:border-accent/30 theme-transition">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <h3 className="font-mono font-bold text-sm text-foreground">
+                    Man-in-the-Middle (MitM) Attack Simulation
+                  </h3>
+                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-muted border border-border text-muted-foreground">
+                    DIPLOMA CAPSTONE
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Conducted a comprehensive research simulation auditing local area networks. Implemented ARP spoofing, DNS poisoning, and SSL stripping vectors, alongside analyzing active packet interception metrics on Wireshark to recommend cryptographic enforcement mitigations.
+                </p>
+              </div>
+            </div>
+
             {/* Education Timeline */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
               <h2 className="text-lg font-bold font-mono text-foreground mb-6 flex items-center gap-2">
@@ -70,20 +131,21 @@ export default function AboutPage() {
                 
                 {/* Education Item 1: B.Tech */}
                 <div className="relative">
-                  {/* Timeline node */}
                   <span className="absolute -left-[31px] top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent ring-4 ring-background">
                     <span className="h-1.5 w-1.5 rounded-full bg-background" />
                   </span>
                   
                   <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                    <h3 className="text-base font-bold font-mono text-foreground">
+                    <h3 className="text-base font-bold font-mono text-foreground leading-tight">
                       B.Tech in Computer Science & Engineering (Cybersecurity)
                     </h3>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-accent/10 border border-accent/20 text-accent uppercase flex-shrink-0 sm:self-start">
                       2025 - Present
                     </span>
                   </div>
-                  <p className="text-xs font-mono text-muted-foreground mt-0.5">2nd Year student</p>
+                  <p className="text-xs font-mono text-muted-foreground mt-0.5">
+                    RNGPIT — R. N. G. Patel Institute of Technology
+                  </p>
                   <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
                     Advanced study focusing on systems security, cryptography, network defense protocols, and active directory infrastructure hardening.
                   </p>
@@ -91,21 +153,20 @@ export default function AboutPage() {
 
                 {/* Education Item 2: Diploma */}
                 <div className="relative">
-                  {/* Timeline node */}
                   <span className="absolute -left-[31px] top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-muted border border-border ring-4 ring-background">
                     <span className="h-1.5 w-1.5 rounded-full bg-background" />
                   </span>
                   
                   <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                    <h3 className="text-base font-bold font-mono text-foreground">
+                    <h3 className="text-base font-bold font-mono text-foreground leading-tight">
                       Diploma in Computer Engineering
                     </h3>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-muted border border-border text-muted-foreground uppercase flex-shrink-0 sm:self-start">
                       2022 - 2025
                     </span>
                   </div>
-                  <p className="text-xs font-mono text-muted-foreground mt-0.5">
-                    Jayvantrai Harrai Desai Polytechnic, Palsana (Affiliated with Gujarat Technological University - GTU)
+                  <p className="text-xs font-mono text-muted-foreground mt-0.5 leading-normal">
+                    Jayvantrai Harrai Desai Polytechnic, Palsana (Affiliated with GTU) · <strong className="text-accent font-semibold">8.86 CGPA</strong>
                   </p>
                   <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
                     Completed formal technical education covering core computer systems architecture, local area network administration, databases, and structured programming methodologies.
