@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldAlert, RefreshCw, Trophy, Award, Users, CheckCircle2 } from "lucide-react";
+import { RefreshCw, Trophy, Award, Users, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface DifficultyStat {
@@ -45,7 +45,6 @@ interface HtbStats {
 export default function HtbStatsCard() {
   const [stats, setStats] = useState<HtbStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [timeAgo, setTimeAgo] = useState("Just now");
 
   const fetchStats = async () => {
@@ -57,10 +56,8 @@ export default function HtbStatsCard() {
       }
       const data = await res.json();
       setStats(data);
-      setError(null);
     } catch (err: unknown) {
       console.error(err);
-      setError(err instanceof Error ? err.message : "Failed to load HTB profile");
     } finally {
       setLoading(false);
     }
@@ -173,30 +170,15 @@ export default function HtbStatsCard() {
       <div className="px-5 py-3 border-b border-border flex items-center justify-between bg-black/[0.04] dark:bg-white/[0.02]">
         <div className="flex items-center gap-3">
           <span className="relative flex h-2.5 w-2.5">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-              displayStats.isMock ? "bg-amber-400" : "bg-accent"
-            }`}></span>
-            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-              displayStats.isMock ? "bg-amber-500" : "bg-accent"
-            }`}></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-accent"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent"></span>
           </span>
           <span className="text-[10px] font-mono font-bold tracking-wider text-muted-foreground uppercase flex items-center gap-1.5">
-            Live Hack The Box Stats
-            {displayStats.isMock && (
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 font-sans tracking-normal normal-case">
-                Demo
-              </span>
-            )}
+            Live Hack The Box Profile
           </span>
         </div>
 
         <div className="flex items-center gap-3">
-          {error && (
-            <span className="text-[10px] font-sans text-rose-500 flex items-center gap-1" title={error}>
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Offline</span>
-            </span>
-          )}
           {stats?.updatedAt && (
             <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1.5">
               <CheckCircle2 className="w-3 h-3 text-accent" />
