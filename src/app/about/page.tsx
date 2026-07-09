@@ -80,7 +80,7 @@ export default function AboutPage() {
                       B.Tech in Computer Science & Engineering (Cybersecurity)
                     </h3>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-accent/10 border border-accent/20 text-accent uppercase flex-shrink-0 sm:self-start">
-                      2024 - Present
+                      2025 - Present
                     </span>
                   </div>
                   <p className="text-xs font-mono text-muted-foreground mt-0.5">2nd Year student</p>
@@ -101,7 +101,7 @@ export default function AboutPage() {
                       Diploma in Computer Engineering
                     </h3>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-muted border border-border text-muted-foreground uppercase flex-shrink-0 sm:self-start">
-                      2021 - 2024
+                      2022 - 2025
                     </span>
                   </div>
                   <p className="text-xs font-mono text-muted-foreground mt-0.5">
