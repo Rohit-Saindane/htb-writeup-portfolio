@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { Search, RotateCcw, AlertTriangle, SlidersHorizontal, Hash } from "lucide-react";
 import WriteupCard from "@/components/WriteupCard";
+import Logo from "@/components/Logo";
 import { WriteupMetadata, FilterOptions } from "@/lib/mdx";
 
 interface WriteupsCatalogProps {
@@ -61,32 +62,47 @@ export default function WriteupsCatalog({ writeups, filterOptions }: WriteupsCat
       <div className="max-w-7xl mx-auto relative z-10">
         
         {/* Catalog Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10 border-b border-border/60 pb-6">
-          <div>
-            <h1 className="text-3xl font-bold font-mono tracking-tight text-foreground flex items-center gap-2">
-              <span className="text-accent">&gt;_</span>
-              <span>All Writeups</span>
-            </h1>
-            <p className="text-sm font-sans text-muted-foreground mt-1.5 leading-relaxed">
-              Explore walkthroughs, nmap scans, and privilege escalation vectors for {writeups.length} lab machines.
-            </p>
-          </div>
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 md:p-8 mb-10 shadow-sm hover:border-accent/30 theme-transition">
+          {/* Cyber grid overlay background */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(159,229,80,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(159,229,80,0.02)_1px,transparent_1px)] bg-[size:1.5rem_1.5rem] opacity-30 pointer-events-none" />
+          <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
           
-          {/* Active Results Count & Reset button */}
-          <div className="flex items-center gap-4 text-xs font-mono">
-            <span className="text-muted-foreground bg-black/10 dark:bg-white/5 border border-border px-3 py-1 rounded-lg">
-              Showing <strong className="text-foreground">{filteredWriteups.length}</strong> of {writeups.length} machines
-            </span>
-            {(searchQuery || selectedSeason !== "all" || selectedOS !== "all" || selectedDifficulty !== "all" || selectedTag !== "all") && (
-              <button
-                onClick={resetFilters}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-accent/10 border border-accent/20 text-accent hover:bg-accent hover:text-background hover:shadow-glow theme-transition cursor-pointer"
-                id="reset-filters-btn"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset Filters</span>
-              </button>
-            )}
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-4">
+                <Logo className="w-10 h-10 text-accent flex-shrink-0" />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-3xl font-bold font-mono tracking-tight text-foreground">
+                      All Writeups
+                    </h1>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-accent/10 border border-accent/20 text-accent uppercase tracking-widest hidden sm:inline-block">
+                      SEC-ARCHIVE
+                    </span>
+                  </div>
+                  <p className="text-sm font-sans text-muted-foreground mt-2 leading-relaxed max-w-2xl">
+                    Systematic penetration testing walkthroughs, vulnerability analyses, and privilege escalation vectors for Hack The Box lab machines.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Active Results Count & Reset button */}
+            <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row items-start sm:items-center md:items-end lg:items-center gap-4 text-xs font-mono self-start md:self-center">
+              <span className="text-muted-foreground bg-background border border-border px-3.5 py-1.5 rounded-lg shadow-inner">
+                Showing <strong className="text-accent">{filteredWriteups.length}</strong> of <strong className="text-foreground">{writeups.length}</strong> machines
+              </span>
+              {(searchQuery || selectedSeason !== "all" || selectedOS !== "all" || selectedDifficulty !== "all" || selectedTag !== "all") && (
+                <button
+                  onClick={resetFilters}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-accent/10 border border-accent/20 text-accent hover:bg-accent hover:text-background hover:shadow-glow theme-transition cursor-pointer"
+                  id="reset-filters-btn"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Filters</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
