@@ -73,7 +73,7 @@ const MOCK_DATA: MappedHtbStats = {
   currentSeasonRank: '#240',
   totalXP: 229,
   ownsUser: 50,
-  ownsRoot: 43,
+  ownsRoot: 44,
   hackingTeam: 'Apophis',
   userTag: 'Pro Hacker',
   userName: 'FluXi0n',
@@ -88,6 +88,7 @@ const MOCK_DATA: MappedHtbStats = {
     { name: 'Insane', owned_machines: 1, total_machines: 68, completion_percentage: 1.47 }
   ],
   recentActivity: [
+    { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1e513f0-690d-4dc2-bd2c-946d3983d026-1780052541.png', type: 'root', id: 912, name: 'Nimbus', points: 40, ownDate: '2026-07-09T15:41:44.000Z' },
     { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1e513f0-690d-4dc2-bd2c-946d3983d026-1780052541.png', type: 'user', id: 912, name: 'Nimbus', points: 20, ownDate: '2026-07-02T14:08:27.000Z' },
     { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1e514a2-69e8-4e79-82ab-176c3b5a26b4-1780052657.png', type: 'root', id: 915, name: 'Enigma', points: 20, ownDate: '2026-07-01T14:45:38.000Z' },
     { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1e514a2-69e8-4e79-82ab-176c3b5a26b4-1780052657.png', type: 'user', id: 915, name: 'Enigma', points: 10, ownDate: '2026-06-30T15:49:59.000Z' },
@@ -124,8 +125,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ...MOCK_DATA, cached: false });
   }
 
+  const force = request.nextUrl.searchParams.get('force') === 'true';
+
   // 3. Cache Hit Check
-  if (cache.data && now - cache.timestamp < CACHE_TTL) {
+  if (!force && cache.data && now - cache.timestamp < CACHE_TTL) {
     return NextResponse.json({
       ...cache.data,
       cached: true,
@@ -141,11 +144,15 @@ export async function GET(request: NextRequest) {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     };
 
+    const fetchOptions = force
+      ? { headers, cache: 'no-store' as const }
+      : { headers, next: { revalidate: 600 } };
+
     // Fetch endpoints concurrently
     const [basicRes, progressRes, activityRes] = await Promise.allSettled([
-      fetch(`https://labs.hackthebox.com/api/v4/user/profile/basic/${htbUserId}`, { headers, next: { revalidate: 600 } }),
-      fetch(`https://labs.hackthebox.com/api/v4/user/profile/progress/machines/${htbUserId}`, { headers, next: { revalidate: 600 } }),
-      fetch(`https://labs.hackthebox.com/api/v5/user/profile/activity/${htbUserId}`, { headers, next: { revalidate: 600 } })
+      fetch(`https://labs.hackthebox.com/api/v4/user/profile/basic/${htbUserId}`, fetchOptions),
+      fetch(`https://labs.hackthebox.com/api/v4/user/profile/progress/machines/${htbUserId}`, fetchOptions),
+      fetch(`https://labs.hackthebox.com/api/v5/user/profile/activity/${htbUserId}`, fetchOptions)
     ]);
 
     let basicJson: HtbBasicProfile | null = null;

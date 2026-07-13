@@ -47,10 +47,10 @@ export default function HtbStatsCard() {
   const [loading, setLoading] = useState(true);
   const [timeAgo, setTimeAgo] = useState("Just now");
 
-  const fetchStats = async () => {
+  const fetchStats = async (force: boolean = false) => {
     try {
       setLoading(true);
-      const res = await fetch("/api/htb-stats");
+      const res = await fetch(`/api/htb-stats${force ? "?force=true" : ""}`);
       if (!res.ok) {
         throw new Error(`Failed to fetch stats: ${res.status}`);
       }
@@ -65,7 +65,7 @@ export default function HtbStatsCard() {
 
   useEffect(() => {
     fetchStats();
-    const interval = setInterval(fetchStats, 5 * 60 * 1000); // Poll every 5 mins
+    const interval = setInterval(() => fetchStats(), 5 * 60 * 1000); // Poll every 5 mins
     return () => clearInterval(interval);
   }, []);
 
@@ -102,7 +102,7 @@ export default function HtbStatsCard() {
     currentSeasonRank: "#240",
     totalXP: 229,
     ownsUser: 50,
-    ownsRoot: 43,
+    ownsRoot: 44,
     hackingTeam: "Apophis",
     userTag: "Pro Hacker",
     userName: "FluXi0n",
@@ -163,7 +163,9 @@ export default function HtbStatsCard() {
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="w-full bg-card rounded-xl border border-border hover:border-accent/40 shadow-glow theme-transition overflow-hidden"
+      className={`w-full bg-card rounded-xl border border-border hover:border-accent/40 shadow-glow theme-transition overflow-hidden relative ${
+        loading && stats ? "after:absolute after:inset-0 after:bg-accent/[0.03] after:backdrop-blur-[0.5px] after:animate-pulse" : ""
+      }`}
       id="htb-stats-card-container"
     >
       {/* Live Status Bar */}
@@ -180,13 +182,13 @@ export default function HtbStatsCard() {
 
         <div className="flex items-center gap-3">
           {stats?.updatedAt && (
-            <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1.5">
+            <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1.5 animate-fadeIn">
               <CheckCircle2 className="w-3 h-3 text-accent" />
               {timeAgo}
             </span>
           )}
           <button
-            onClick={fetchStats}
+            onClick={() => fetchStats(true)}
             disabled={loading}
             className="p-1 rounded hover:bg-border text-muted-foreground hover:text-foreground cursor-pointer theme-transition"
             aria-label="Refresh stats"

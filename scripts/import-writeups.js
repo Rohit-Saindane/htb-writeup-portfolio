@@ -117,7 +117,8 @@ function importWriteups() {
       const date = data.date ? new Date(data.date).toISOString().split('T')[0] : '2026-03-22';
       const pointsAwarded = data.pointsAwarded || data.points || getDefaultPoints(difficulty);
       const machineIP = data.machineIP || data.ip || '';
-      const summary = data.summary || generateSummary(content, title);
+      const rawSummary = data.summary ? data.summary.trim() : '';
+      const summary = (rawSummary === '---' || !rawSummary) ? generateSummary(content, title) : rawSummary;
 
       // Formulate clean frontmatter
       const normalizedFrontmatter = {

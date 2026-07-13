@@ -67,17 +67,27 @@ export function getAllWriteups(): WriteupMetadata[] {
     const wordCount = content.split(/\s+/).filter(Boolean).length;
     const readingTime = Math.max(1, Math.ceil(wordCount / 200));
 
+    const title = data.title || machineSlug;
+    const os = (data.os || 'linux').toLowerCase() as 'linux' | 'windows';
+    const difficulty = (data.difficulty || 'easy').toLowerCase() as 'easy' | 'medium' | 'hard' | 'insane';
+    const tags = Array.isArray(data.tags) ? data.tags : [];
+    
+    const rawSummary = data.summary ? data.summary.trim() : '';
+    const summary = (rawSummary === '---' || !rawSummary)
+      ? `A detailed pentesting walkthrough for the ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} ${os.charAt(0).toUpperCase() + os.slice(1)} machine "${title}" on Hack The Box${tags.length > 0 ? `, featuring ${tags.slice(0, 3).join(', ')}` : ''}.`
+      : rawSummary;
+
     return {
-      title: data.title || machineSlug,
+      title,
       machineName: data.machineName || data.title || machineSlug,
-      os: (data.os || 'linux').toLowerCase() as 'linux' | 'windows',
-      difficulty: (data.difficulty || 'easy').toLowerCase() as 'easy' | 'medium' | 'hard' | 'insane',
+      os,
+      difficulty,
       season: data.season || 'Season 10',
-      tags: Array.isArray(data.tags) ? data.tags : [],
+      tags,
       date: data.date ? new Date(data.date).toISOString().split('T')[0] : '2026-03-22',
       pointsAwarded: Number(data.pointsAwarded || 20),
       machineIP: data.machineIP || '',
-      summary: data.summary || '',
+      summary,
       slug: machineSlug,
       seasonSlug,
       filePath: path.relative(process.cwd(), filePath).replace(/\\/g, '/'),
@@ -114,17 +124,27 @@ export function getWriteupBySlug(slug: string): Writeup | null {
       const wordCount = content.split(/\s+/).filter(Boolean).length;
       const readingTime = Math.max(1, Math.ceil(wordCount / 200));
 
+      const title = data.title || machineSlug;
+      const os = (data.os || 'linux').toLowerCase() as 'linux' | 'windows';
+      const difficulty = (data.difficulty || 'easy').toLowerCase() as 'easy' | 'medium' | 'hard' | 'insane';
+      const tags = Array.isArray(data.tags) ? data.tags : [];
+      
+      const rawSummary = data.summary ? data.summary.trim() : '';
+      const summary = (rawSummary === '---' || !rawSummary)
+        ? `A detailed pentesting walkthrough for the ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} ${os.charAt(0).toUpperCase() + os.slice(1)} machine "${title}" on Hack The Box${tags.length > 0 ? `, featuring ${tags.slice(0, 3).join(', ')}` : ''}.`
+        : rawSummary;
+
       const metadata: WriteupMetadata = {
-        title: data.title || machineSlug,
+        title,
         machineName: data.machineName || data.title || machineSlug,
-        os: (data.os || 'linux').toLowerCase() as 'linux' | 'windows',
-        difficulty: (data.difficulty || 'easy').toLowerCase() as 'easy' | 'medium' | 'hard' | 'insane',
+        os,
+        difficulty,
         season: data.season || 'Season 10',
-        tags: Array.isArray(data.tags) ? data.tags : [],
+        tags,
         date: data.date ? new Date(data.date).toISOString().split('T')[0] : '2026-03-22',
         pointsAwarded: Number(data.pointsAwarded || 20),
         machineIP: data.machineIP || '',
-        summary: data.summary || '',
+        summary,
         slug: machineSlug,
         seasonSlug,
         filePath: path.relative(process.cwd(), filePath).replace(/\\/g, '/'),

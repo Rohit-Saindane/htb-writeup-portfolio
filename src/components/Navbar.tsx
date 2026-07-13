@@ -5,6 +5,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X, FileText } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
+import Logo from "./Logo";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,10 +26,10 @@ export default function Navbar() {
           <div className="flex-shrink-0">
             <Link 
               href="/" 
-              className="text-xl font-bold font-mono tracking-wider hover:text-accent theme-transition flex items-center gap-2"
+              className="text-xl font-bold font-mono tracking-wider hover:text-accent theme-transition flex items-center gap-2 group"
               id="navbar-logo-link"
             >
-              <span className="text-accent">&gt;_</span>
+              <Logo className="w-6 h-6 text-accent group-hover:scale-110 transition-transform duration-300" />
               <span>Rohit Saindane</span>
             </Link>
           </div>
