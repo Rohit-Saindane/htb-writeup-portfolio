@@ -115,6 +115,8 @@ Nmap done: 1 IP address (1 host up) scanned in 1210.47 seconds
 
 ## Step 2 - Initial Foothold
 
+### WPA2-Enterprise Rogue AP PEAP-MSCHAPv2 Hash Harvest
+
 - 🔍 *Since we know that SNMP is open, lets try enumerating SNMP version and Community Strings (which may contain, leaked creds)*
 
 ```bash
@@ -184,6 +186,8 @@ consultant@AirTouch-Consultant:/$
 ---
 
 ## Step 3 - Lateral Movement to AirTouch-Internet
+
+### Hashcat Net-NTLMv1 Cracking & Network Pivot
 
 - 🔍 *Lets try to look what Priv Consultant has*
 
@@ -290,7 +294,7 @@ drwxr-xr-x 2 root root  4096 Mar 27  2024 wordlists
 
 ---
 
-### Execution
+### EAPHammer Rogue AP Setup & Deauth Attack
 
 #### 1. Creating Fake Access Point
 
@@ -782,6 +786,8 @@ drwxr-xr-x 1 root root 4096 Jan 18 00:08 psk
 
 ## Step 5 - Root Access
 
+### RADIUS User Database Extraction & Root Takeover
+
 - 🔍 *The Shell that we have Just pawned, has some core AP Configuration Files*
 
 ```bash
@@ -937,7 +943,7 @@ sshpass -p "$REMOTE_PASSWORD" scp -r "$LOCAL_FOLDER" "$REMOTE_USER@10.10.10.1:$R
 
 ---
 
-### Execution
+### RADIUS MSCHAPv2 Authentication Relay & Hashcat Cracking
 
 - 🔍 *Lets First Check On what Channel AirTouch-Office is Operating ON:-*
 

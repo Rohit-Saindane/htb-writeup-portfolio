@@ -285,7 +285,7 @@ drwxr-xr-x 2 root root  4096 Mar 27  2024 wordlists
 
 ---
 
-### Execution
+### EAPHammer Rogue AP Setup & Deauth Attack
 
 #### 1. Creating Fake Access Point
 
@@ -932,7 +932,7 @@ sshpass -p "$REMOTE_PASSWORD" scp -r "$LOCAL_FOLDER" "$REMOTE_USER@10.10.10.1:$R
 
 ---
 
-### Execution
+### RADIUS MSCHAPv2 Authentication Relay & Hashcat Cracking
 
 - 🔍 *Lets First Check On what Channel AirTouch-Office is Operating ON:-*
 

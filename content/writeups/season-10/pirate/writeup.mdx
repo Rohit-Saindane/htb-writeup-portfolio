@@ -155,6 +155,8 @@ SMB         10.129.7.251    445    DC01             j.sparrow                   
 SMB         10.129.7.251    445    DC01             [*] Enumerated 7 local users: PIRATE
 ```
 
+### Pre2k Computer Account & BloodHound Enumeration
+
 - 🔍 *We check BloodHound and notice that the `Pre-Windows 2000 Compatible Access` group contains the pre-created computer accounts `EXCH01$` and `MS01$`. Since `Domain Users` belongs to this group, we can query TGT tickets for these machine accounts:*
 
 ```text
@@ -205,6 +207,8 @@ PRE2K       10.129.11.99    389    DC01             [+] Successfully obtained TG
 		 ↓
    Remote Management 
 ```
+
+### gMSA Password & NTLM Hash Extraction
 
 - 🔍 *This is the clear path to get the initial foothold: we can read the NTLM hashes for `GMSA_ADFS`, and then we can use it to get the evil-winrm shell:*
 
@@ -261,6 +265,8 @@ Ethernet adapter Ethernet0 2:
    Subnet Mask . . . . . . . . . . . : 255.255.0.0
    Default Gateway . . . . . . . . . : 10.129.0.1
 ```
+
+### Internal Subnet Pivoting (192.168.100.0/24) via fscan
 
 - 🔍 *We see Switch01 on the internal `192.168.100.0/24` subnet. Let's perform a fast scan using `fscan`:*
 
@@ -334,6 +340,8 @@ COERCE_PLUS 224.0.0.1       445    WEB01            VULNERABLE, PrinterBug
 COERCE_PLUS 224.0.0.1       445    WEB01            VULNERABLE, MSEven
 ```
 
+### PetitPotam MS-EFSRPC Coercion Attack (CVE-2021-36942)
+
 - 🔍 *The host is vulnerable to PETITPOTAM.*
 
 > [!NOTE]
@@ -345,6 +353,8 @@ COERCE_PLUS 224.0.0.1       445    WEB01            VULNERABLE, MSEven
 > 1. **Forced Authentication (Coercion):** The attacker sends a specially crafted MS-EFSRPC (Encrypting File System Remote Protocol) request—specifically using the `EfsRpcOpenFileRaw` function—to a target server (e.g. `WEB01`).
 > 2. **NTLM Relay:** The target host attempts to authenticate to the attacker-controlled server via NTLM.
 > 3. **RBCD Takeover:** The attacker relays this NTLM authentication to the Domain Controller's LDAPS service to modify delegation permissions on `WEB01`.
+
+### NTLM Relay via ntlmrelayx to LDAPS
 
 - 🔍 *Let's set up `ntlmrelayx.py` to relay authentication to LDAPS on the DC (`192.168.100.1`):*
 
@@ -451,6 +461,8 @@ Continue (C) | Skip this function (S) | Stop exploitation (X) ?
 [*] ldaps://PIRATE/WEB01$@192.168.100.1 [1] -> Delegation rights modified succesfully!
 [*] ldaps://PIRATE/WEB01$@192.168.100.1 [1] -> PPXJROQK$ can now impersonate users on WEB01$ via S4U2Proxy
 ```
+
+### S4U2Self Service Ticket Request & Secretsdump
 
 - 🔍 *With the newly created computer account, we request a service ticket (S4U) impersonating `Administrator` on `WEB01`:*
 
@@ -624,6 +636,8 @@ Mode                LastWriteTime         Length Name
   DC01.Pirate.htb
 ```
 
+### Fluxion Credential Extraction & SPN Delegation Hunting
+
 - 🔍 *This should be the clear attack path towards gaining access to the domain.*
 - 🔍 *Attack Execution:*
 - 🔍 *The first step is to force change the password of `a.white_adm`:*
@@ -673,6 +687,8 @@ LDAP        10.129.244.95   389    DC01             a.white_adm Person      Cons
    	    ↓
 	Escalate to DC
 ```
+
+### Resource-Based Constrained Delegation (RBCD) Configuration
 
 - 🔍 *Now we know that the HTTP service is only accessible via `WEB01` and not by `DC01`:*
 
@@ -781,6 +797,8 @@ a.white_adm
 > 3. **The Check (Constrained Delegation):** The DC checks the properties of the `a.white_adm` account. It asks: "Is this account specifically allowed to 'delegate' to WEB01?" (In a Windows environment, this is usually defined in the `msDS-AllowedToDelegateTo` attribute).
 > 4. **The Ticket Grant:** If the account is allowed, the DC issues a new Service Ticket.
 > 5. **The Catch:** This new ticket is for the HTTP service on `WEB01`, but the name on the ticket is `Administrator`.
+
+### S4U2Proxy Ticket Request & Domain Admin Takeover
 
 - 🔍 *Now that we have everything, let's request for a TGS of `Administrator`:*
 

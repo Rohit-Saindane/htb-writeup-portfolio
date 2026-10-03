@@ -257,6 +257,8 @@ Ethernet adapter Ethernet0 2:
    Default Gateway . . . . . . . . . : 10.129.0.1
 ```
 
+### Internal Subnet Pivoting (192.168.100.0/24) via fscan
+
 - 🔍 *We see Switch01 on the internal `192.168.100.0/24` subnet. Let's perform a fast scan using `fscan`:*
 
 ```powershell
@@ -329,6 +331,8 @@ COERCE_PLUS 224.0.0.1       445    WEB01            VULNERABLE, PrinterBug
 COERCE_PLUS 224.0.0.1       445    WEB01            VULNERABLE, MSEven
 ```
 
+### PetitPotam MS-EFSRPC Coercion Attack (CVE-2021-36942)
+
 - 🔍 *The host is vulnerable to PETITPOTAM.*
 
 > [!NOTE]
@@ -340,6 +344,8 @@ COERCE_PLUS 224.0.0.1       445    WEB01            VULNERABLE, MSEven
 > 1. **Forced Authentication (Coercion):** The attacker sends a specially crafted MS-EFSRPC (Encrypting File System Remote Protocol) request—specifically using the `EfsRpcOpenFileRaw` function—to a target server (e.g. `WEB01`).
 > 2. **NTLM Relay:** The target host attempts to authenticate to the attacker-controlled server via NTLM.
 > 3. **RBCD Takeover:** The attacker relays this NTLM authentication to the Domain Controller's LDAPS service to modify delegation permissions on `WEB01`.
+
+### NTLM Relay via ntlmrelayx to LDAPS
 
 - 🔍 *Let's set up `ntlmrelayx.py` to relay authentication to LDAPS on the DC (`192.168.100.1`):*
 

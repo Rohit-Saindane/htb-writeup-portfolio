@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, X, FileText } from "lucide-react";
+import { Menu, X, FileText, Search } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import Logo from "./Logo";
+import { openSearchModal } from "@/lib/cyberEvents";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -54,7 +55,19 @@ export default function Navbar() {
             </div>
 
             {/* Accent Action Buttons */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => openSearchModal()}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card/80 hover:bg-card border border-border hover:border-accent/50 text-muted-foreground hover:text-foreground font-mono text-xs transition-all cursor-pointer shadow-sm"
+                id="navbar-search-btn"
+                title="Search writeups & exploit database (Ctrl+K)"
+              >
+                <Search className="w-3.5 h-3.5 text-accent" />
+                <span className="hidden lg:inline">Search...</span>
+                <kbd className="px-1.5 py-0.5 text-[10px] bg-background/80 border border-border rounded text-muted-foreground">
+                  ⌘K
+                </kbd>
+              </button>
               <ThemeToggle />
               <a
                 href="/resume.pdf"
@@ -69,7 +82,15 @@ export default function Navbar() {
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="flex md:hidden items-center gap-3">
+          <div className="flex md:hidden items-center gap-2">
+            <button
+              onClick={() => openSearchModal()}
+              className="p-2 rounded-md text-muted-foreground hover:text-foreground bg-card border border-border flex items-center justify-center cursor-pointer"
+              aria-label="Search"
+              id="mobile-search-btn"
+            >
+              <Search className="w-4 h-4 text-accent" />
+            </button>
             <ThemeToggle />
             <button
               onClick={() => setIsOpen(!isOpen)}

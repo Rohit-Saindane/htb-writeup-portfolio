@@ -290,6 +290,8 @@ NT_STATUS_ACCESS_DENIED listing \garfield.htb\DfsrPrivate\*
 
 ## Step 2 - Enumeration
 
+### Enumerating Writable AD Attributes (scriptPath)
+
 - 🔍 *Lets First check what are the writeables for the current user!*
 
 ```bash
@@ -405,6 +407,8 @@ scriptPath: WRITE
 ---
 
 ## Step 3 - Initial Foothold
+
+### Insecure scriptPath Abuse via SYSVOL Reverse Shell
 
 - 🔍 *first i have tried creating a Reverse shell payload for windows, but it didn't worked.*
 - 🔍 *Then i knew that i have to encode it into base64 to be executed.*
@@ -548,6 +552,8 @@ Mode                LastWriteTime         Length Name
 ---
 
 ## Step 4 - Privilege Escalation
+
+### BloodHound Graph Analysis & RODC Architecture
 
 - 🔍 *First thing i took was the bloodhound:*
 
@@ -801,6 +807,8 @@ SID               : S-1-5-32-544
 ```
 
 - 🔍 *As Expected The CN=Administrators is in Denied list. so we need to remove it from the denied list and as well, add it to the allowed list*
+### bloodyAD addSelf to RODC Administrators
+
 - 🔍 *After Searching for a while, we have WriteAccountRestriction over RODC01, so we can use some of the attributes*
 - 🔍 *But here's a catch l.wilson_adm is in Tier-01 OU, and to abuse WriteAccountRestrictions, we need Tier-0 level privileges. so now we can't directly use those security attributes from this group, we need to escalate*
 - 🔍 *Since we are in Tier-01 and every member/Object of Tier-01 has addSelf privilges over Administrator(which is a Tier-0 OU). we can then use these WriteAccountRestriction Privileges.*
@@ -854,6 +862,8 @@ proxychains bloodyAD -d garfield.htb -u l.wilson_adm -p 'NewPassword123!' --host
 >     ↓
 > Full Domain Compromise of DC01
 > ```
+
+### Resource-Based Constrained Delegation (RBCD) Abuse
 
 - 🔍 *So now that we are in RODC administrators lets abuse RBCD*
 - 🔍 *Lets First create a new account*
@@ -965,6 +975,8 @@ Impacket v0.14.0.dev0+20251114.155318.8925c2ce - Copyright Fortra, LLC and its a
 C:\>whoami
 garfield\administrator
 ```
+
+### Dumping RODC Signing Key via Mimikatz
 
 - 🔍 *Now to Get the signing ticket for RODC krbtgt_1234 account, we need to use mimikatz that will extract all the info*
 
@@ -1082,6 +1094,8 @@ Bye!
 ```
 
 - 🔍 *We got the key!*
+### RODC Password Replication Policy (PRP) Manipulation
+
 - 🔍 *Now Before asking for real krbtgt password hash from DC01, we need to add administrator of RODC to allowed list of key_list and need to also remove from denied list!*
 - 🔍 *Lets first add the administrator in allowed list*
 
@@ -1197,6 +1211,8 @@ C:\>.\Rubeus.exe golden /rodcNumber:8245 /flags:forwardable,renewable,enc_pa_rep
 
 [*] Ticket written to administrator_2026_04_11_23_19_53_Administrator_to_krbtgt@GARFIELD.HTB.kirbi
 ```
+
+### RODC Key List Attack & Domain Controller Sync
 
 - 🔍 *We got the golden ticket, now lets ask for real krbtgt password hash!*
 

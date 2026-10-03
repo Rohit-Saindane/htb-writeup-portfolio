@@ -276,6 +276,8 @@ Nmap done: 1 IP address (1 host up) scanned in 115.40 seconds
 
 ## Step 2 - Initial Foothold
 
+### Mirth Connect Deserialization RCE (CVE-2023-43208)
+
 - 🔍 *While enumerating the web services, I found that port 80 and port 443 host a Mirth Connect Administrator panel.*
 - 🔍 *Scanning the target reveals the version is Mirth Connect 4.4.0, which is vulnerable to CVE-2023-43208.*
 - 🔍 *(Note: You can also use the Metasploit exploit for this attack, but manual exploitation is recommended).*
@@ -390,6 +392,8 @@ mirth@interpreter:/usr/local/mirthconnect$
 ---
 
 ## Step 3 - Privilege Escalation
+
+### Server-Side Template Injection (SSTI) in /addPatient
 
 - 🔍 *linPEAS didn't give me anything useful.*
 - 🔍 *While enumerating, found some configuration files:*

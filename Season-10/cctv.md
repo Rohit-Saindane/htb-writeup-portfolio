@@ -171,6 +171,8 @@ Table: Users
 +-------------------------------------------------------------------------+
 ```
 
+### Hashcat Bcrypt Password Cracking & SSH Access
+
 - 🔍 *We crack the bcrypt hash using Hashcat:*
 
 ```bash
@@ -203,6 +205,8 @@ mark@cctv:~$
 
 ## Step 3 - Privilege Escalation
 
+### motionEye Configuration Command Injection (CVE-2025-60787)
+
 - 🔍 *We run system enumeration (e.g. linPEAS) and discover a local `motioneye` service instance running on port 8765:*
 
 ```text
@@ -210,6 +214,8 @@ tcp        0      0 127.0.0.1:8765          0.0.0.0:*               LISTEN
 motioneye.service                        loaded active running motionEye Server
  └─ RUNS_AS_ROOT: Service runs as root
 ```
+
+### Chisel Local Port Forwarding for Internal motionEye
 
 - 🔍 *The service runs as root. Since port 8765 only binds to localhost, we tunnel it using `chisel`:*
 

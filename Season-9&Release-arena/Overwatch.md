@@ -405,6 +405,8 @@ ERROR(MSOLEDBSQL): Line 0: TCP Provider: An existing connection was forcibly clo
 - **USER:** sqlmgmt
 - **PASS:** bIhBbzMMnB82yx
 
+### Evil-WinRM Authentication as sqlmgmt & User Flag
+
 - 🔍 *Now Lets see if we can access Evil-winrm, well obviously we cam, because while enumerating i have seen that sqlmgmt is in Remote Management Group*
 
 ```bash
@@ -509,6 +511,8 @@ Local Group Memberships      *Administrators
 Global Group memberships     *Domain Users
 The command completed successfully.
 ```
+
+### Impacket Secretsdump SAM & LSA Hash Extraction to SYSTEM
 
 - 🔍 *Great, User is Added, lets dump the hashes now*
 

@@ -227,6 +227,17 @@ export function getGithubWriteupPath(seasonSlug: string, slug: string): string {
       "silentium": "Season-10/Silentium.md",
       "variatype": "Season-10/VariaType.md",
       "wingdata": "Season-10/WingData.md"
+    },
+    "season-11": {
+      "bedside": "Season-11/Bedside.md",
+      "checkpoint": "Season-11/Checkpoint.md",
+      "connected": "Season-11/connector.md",
+      "darkzeroreturns": "Season-11/DarkZeroReturns.md",
+      "devhub": "Season-11/DevHub.md",
+      "enigma": "Season-11/enigma.md",
+      "nimbus": "Season-11/Nimbus.md",
+      "paperwork": "Season-11/paperwork.md",
+      "reactor": "Season-11/reactor.md"
     }
   };
 
@@ -234,7 +245,12 @@ export function getGithubWriteupPath(seasonSlug: string, slug: string): string {
   if (pathResult) return pathResult;
 
   // Fallback default logic if not in map
-  const folder = seasonSlug === "season-9-release-arena" ? "Season-9&Release-arena" : "Season-10";
+  const folder =
+    seasonSlug === "season-9-release-arena"
+      ? "Season-9&Release-arena"
+      : seasonSlug === "season-11"
+      ? "Season-11"
+      : "Season-10";
   const capitalName = slug.charAt(0).toUpperCase() + slug.slice(1);
   return `${folder}/${capitalName}.md`;
 }

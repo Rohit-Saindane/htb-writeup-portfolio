@@ -1,87 +1,27 @@
 import Link from "next/link";
-import { ArrowRight, Terminal, Cpu, Radar, Shield, Zap, Code2, GitBranch, Activity, Key, Network } from "lucide-react";
+import { ArrowRight, Terminal, Shield, Cpu } from "lucide-react";
 import HtbStatsCard from "@/components/HtbStatsCard";
 import WriteupCard from "@/components/WriteupCard";
+import ToolCard from "@/components/ToolCard";
+import HeroHeadline from "@/components/HeroHeadline";
 import { getAllWriteups } from "@/lib/mdx";
-
-const toolsList = [
-  {
-    name: "Nmap",
-    category: "Network Recon",
-    description: "Host discovery, port scanning, OS detection, and custom vulnerability scripting (NSE).",
-    icon: Radar,
-    colorClass: "text-blue-400 group-hover:text-blue-500",
-    hoverBorder: "hover:border-blue-500/40"
-  },
-  {
-    name: "Burp Suite",
-    category: "Web App Proxy",
-    description: "Proxy intercept, web request tampering, repeater, intruder, and automated scanner tests.",
-    icon: Shield,
-    colorClass: "text-orange-400 group-hover:text-orange-500",
-    hoverBorder: "hover:border-orange-500/40"
-  },
-  {
-    name: "Metasploit",
-    category: "Exploitation",
-    description: "Modular framework for writing, testing, and executing exploit payloads against targets.",
-    icon: Zap,
-    colorClass: "text-red-400 group-hover:text-red-500",
-    hoverBorder: "hover:border-red-500/40"
-  },
-  {
-    name: "Python & Bash",
-    category: "Exploit Dev",
-    description: "Writing custom scripts, automating payload delivery, and modifying proof-of-concepts.",
-    icon: Code2,
-    colorClass: "text-yellow-400 group-hover:text-yellow-500",
-    hoverBorder: "hover:border-yellow-500/40"
-  },
-  {
-    name: "BloodHound",
-    category: "Active Directory",
-    description: "Mapping complex trust relationships, domain paths, and privilege escalation routes.",
-    icon: GitBranch,
-    colorClass: "text-purple-400 group-hover:text-purple-500",
-    hoverBorder: "hover:border-purple-500/40"
-  },
-  {
-    name: "Wireshark",
-    category: "Packet Analysis",
-    description: "Deep inspection of network protocols, packet capturing, analysis, and forensics.",
-    icon: Activity,
-    colorClass: "text-cyan-400 group-hover:text-cyan-500",
-    hoverBorder: "hover:border-cyan-500/40"
-  },
-  {
-    name: "Mimikatz & Rubeus",
-    category: "AD Exploitation",
-    description: "LSASS dumping, ticket extraction, Pass-the-Hash (PtH), and Kerberos ticket attacks.",
-    icon: Key,
-    colorClass: "text-emerald-400 group-hover:text-emerald-500",
-    hoverBorder: "hover:border-emerald-500/40"
-  },
-  {
-    name: "Chisel & Proxychains",
-    category: "Pivoting & Tunneling",
-    description: "Local/remote port forwarding, SOCKS proxy tunneling, and traversing firewall barriers.",
-    icon: Network,
-    colorClass: "text-pink-400 group-hover:text-pink-500",
-    hoverBorder: "hover:border-pink-500/40"
-  },
-  {
-    name: "Hashcat & John",
-    category: "Password Cracking",
-    description: "GPU-accelerated hash cracking, custom rule file creation, and credential recovery.",
-    icon: Cpu,
-    colorClass: "text-rose-400 group-hover:text-rose-500",
-    hoverBorder: "hover:border-rose-500/40"
-  }
-];
+import { toolsData } from "@/lib/toolsData";
 
 export default function Home() {
   const allWriteups = getAllWriteups();
-  const featuredWriteups = allWriteups.slice(0, 3); // Get the 3 most recent writeups
+  // User curated Homepage Hero writeups: DarkZero Returns, Bedside, and Nimbus
+  const heroSlugs = ["darkzeroreturns", "bedside", "nimbus"];
+  const featuredWriteups = heroSlugs
+    .map((slug) => allWriteups.find((w) => w.slug === slug))
+    .filter((w): w is NonNullable<typeof w> => Boolean(w));
+
+  if (featuredWriteups.length < 3) {
+    featuredWriteups.push(
+      ...allWriteups
+        .filter((w) => !featuredWriteups.some((f) => f.slug === w.slug))
+        .slice(0, 3 - featuredWriteups.length)
+    );
+  }
 
   return (
     <div className="w-full min-h-screen bg-background text-foreground font-sans selection:bg-accent/30 selection:text-accent">
@@ -97,10 +37,8 @@ export default function Home() {
             Security Research • Offensive Security
           </div>
 
-          {/* Heading */}
-          <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-foreground font-mono mb-6 max-w-4xl mx-auto">
-            Breaking things, then writing about how I did it
-          </h1>
+          {/* Dynamic Wave-Lift Interactive Headline */}
+          <HeroHeadline text="Breaking things, then writing about how I did it" />
 
           {/* Description */}
           <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto mb-10 font-sans leading-relaxed">
@@ -126,21 +64,25 @@ export default function Home() {
             </Link>
           </div>
           
-          <div className="mt-10 flex flex-wrap justify-center items-center gap-3 sm:gap-6 text-[10px] font-mono text-muted-foreground tracking-widest uppercase">
-            <span className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-accent/5 border border-accent/10">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              <span className="text-accent font-semibold">STATUS: ACTIVE HUNTING</span>
-            </span>
-            <span className="hidden sm:inline text-border">|</span>
-            <span className="flex items-center gap-2">
-              <Terminal className="w-3.5 h-3.5 opacity-60" />
-              <span>ROOT FLAGS: {allWriteups.length}</span>
-            </span>
-            <span className="hidden sm:inline text-border">|</span>
-            <span className="flex items-center gap-2">
-              <Cpu className="w-3.5 h-3.5 opacity-60" />
-              <span>FOCUS: ACTIVE DIRECTORY</span>
-            </span>
+          {/* Cyber Telemetry Status Bar */}
+          <div className="mt-12 inline-flex flex-wrap items-center justify-center gap-3 sm:gap-6 px-5 py-2.5 rounded-xl bg-card/80 border border-border backdrop-blur-md shadow-glow theme-transition text-xs font-mono">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+              </span>
+              <span className="text-emerald-400 font-bold tracking-wider uppercase">Active Security Operations</span>
+            </div>
+            <span className="hidden sm:inline text-border font-light">|</span>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Terminal className="w-4 h-4 text-purple-400" />
+              <span>Root Shells: <strong className="text-foreground font-semibold">{allWriteups.length} Labs</strong></span>
+            </div>
+            <span className="hidden sm:inline text-border font-light">|</span>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Shield className="w-4 h-4 text-cyan-400" />
+              <span>Specialty: <strong className="text-foreground font-semibold">Active Directory & Web Chaining</strong></span>
+            </div>
           </div>
         </div>
       </section>
@@ -189,35 +131,9 @@ export default function Home() {
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {toolsList.map((tool) => {
-            const Icon = tool.icon;
-            return (
-              <div
-                key={tool.name}
-                className={`flex flex-col gap-3 p-5 rounded-xl bg-card border border-border ${tool.hoverBorder} hover:scale-[1.02] hover:shadow-glow theme-transition duration-300 relative overflow-hidden group cursor-default`}
-              >
-                {/* Visual Accent glow line */}
-                <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-accent/20 to-transparent group-hover:via-accent/60 theme-transition" />
-                
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-black/10 dark:bg-white/5 border border-border group-hover:border-accent/30 theme-transition">
-                    <Icon className={`w-5 h-5 ${tool.colorClass} theme-transition`} />
-                  </div>
-                  <div>
-                    <h3 className="font-mono font-bold text-foreground group-hover:text-accent theme-transition text-base leading-tight">
-                      {tool.name}
-                    </h3>
-                    <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
-                      {tool.category}
-                    </span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground font-sans leading-relaxed mt-1">
-                  {tool.description}
-                </p>
-              </div>
-            );
-          })}
+          {toolsData.map((tool) => (
+            <ToolCard key={tool.id} tool={tool} />
+          ))}
         </div>
       </section>
     </div>

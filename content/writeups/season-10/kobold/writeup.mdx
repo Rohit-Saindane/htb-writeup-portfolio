@@ -177,6 +177,8 @@ Task Completed
 
 ## Step 2 - Initial Foothold
 
+### MCPJam Inspector Command Execution (CVE-2026-23744)
+
 - 🔍 *We can write a bash command that will bind a reverse shell back to our machine.*
 - 🔍 *Set up a listener on our machine, then execute a POST request to `/api/mcp/connect` with curl:*
 
@@ -209,6 +211,8 @@ ben@kobold:/usr/local/lib/node_modules/@mcpjam/inspector$
 ---
 
 ## Step 3 - Privilege Escalation
+
+### Insecure Docker Group Socket Privilege Escalation
 
 - 🔍 *We check our group membership and find that we belong to the `docker` group.*
 - 🔍 *This allows us to mount the whole host filesystem into a container and read or write any file.*

@@ -7,6 +7,7 @@ import MdxContent from "@/components/MdxContent";
 import TableOfContents from "./TableOfContents";
 import { getWriteupBySlug, getAllWriteups } from "@/lib/mdx";
 import PageTransition from "@/components/PageTransition";
+import WriteupDeepLink from "@/components/WriteupDeepLink";
 
 interface PageProps {
   params: {
@@ -44,15 +45,32 @@ export default function WriteupDetailPage({ params }: PageProps) {
   const logoAbsolutePath = path.join(process.cwd(), "public", "images", "machines", `${metadata.slug}.png`);
   const hasLogo = fs.existsSync(logoAbsolutePath);
 
-  // Parse headings (##) for Table of Contents
-  const headings = content
-    .split("\n")
-    .filter((line) => line.startsWith("## "))
-    .map((line) => {
-      const text = line.substring(3).trim();
-      const id = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "") || "";
-      return { text, id };
-    });
+  // Parse headings (## and ###) for Table of Contents, ignoring code blocks
+  let inCodeBlock = false;
+  const headings: { text: string; id: string; level: number }[] = [];
+
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock) continue;
+
+    if (
+      (line.startsWith("## ") || line.startsWith("### ")) &&
+      !line.toLowerCase().includes("target information")
+    ) {
+      const isH3 = line.startsWith("### ");
+      const rawText = isH3 ? line.substring(4).trim() : line.substring(3).trim();
+      const id =
+        rawText
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)+/g, "") || "";
+      headings.push({ text: rawText, id, level: isH3 ? 3 : 2 });
+    }
+  }
 
   // Calculate Previous and Next writeups in list
   const allWriteups = getAllWriteups();
@@ -75,6 +93,7 @@ export default function WriteupDetailPage({ params }: PageProps) {
   return (
     <div className="w-full min-h-screen bg-background py-12 text-foreground">
       <PageTransition>
+        <WriteupDeepLink />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Back Link Header */}

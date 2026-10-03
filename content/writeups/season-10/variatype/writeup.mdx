@@ -253,6 +253,8 @@ Target: http://portal.variatype.htb/
 [14:41:02] 200 -    2KB - /index.php
 ```
 
+### Exposed .git Repository Reconstruction & Credential Leakage
+
 - 🔍 *The `.git` repository folder is exposed. We write a python script `Complete Portal Downloader` to systematically reconstruct the `.git` database and download all source files:*
 
 ```python
@@ -547,6 +549,8 @@ $USERS = [
 
 ## Step 2 - Initial Foothold
 
+### fontTools XML Injection & Path Traversal (CVE-2025-66034)
+
 - 🔍 *Reviewing vulnerabilities in `fontTools.varLib` affecting versions `4.33.0` to `< 4.60.2`:*
 
 > [!WARNING]
@@ -660,6 +664,8 @@ www-data@variatype:~/portal.variatype.htb/public/files$ whoami
 www-data
 ```
 
+### Cron Job Filename Command Injection via Malicious Zip
+
 - 🔍 *Local system enumeration reveals a recurring Cron job executing an unzipping script:*
   `/home/steve/bin/process_client_submissions.sh`
 
@@ -712,6 +718,8 @@ cat /home/steve/user.txt
 ---
 
 ## Step 3 - Privilege Escalation
+
+### setuptools PackageIndex Path Traversal to Root (CVE-2025-47273)
 
 - 🔍 *We check Steve's sudo permissions:*
 

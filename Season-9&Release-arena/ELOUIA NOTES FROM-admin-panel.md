@@ -437,7 +437,7 @@ Failure2Ban.exe BUILTIN\Administrators ELOQUIA\Olivia.KAT Allow  Write, ReadAndE
 > 4. Set up a Netcat Listener.
 > 5. Repeatedly overwrite the content of the service `Failure2Ban.exe` with `Failure.exe`.
 
-### Execution
+### Failure2Ban Service Binary Hijacking & Exploitation
 
 #### 1. Create Exploit.c
 

@@ -11,6 +11,23 @@ interface MdxLinkProps {
   children?: React.ReactNode;
 }
 
+function extractTextFromNode(node: React.ReactNode): string {
+  if (!node) return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractTextFromNode).join("");
+  if (React.isValidElement(node) && (node.props as { children?: React.ReactNode })?.children) {
+    return extractTextFromNode((node.props as { children?: React.ReactNode }).children);
+  }
+  return "";
+}
+
+function slugifyHeading(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
 // Custom heading elements with styling and anchor links
 const H1 = ({ children }: MdxComponentProps) => (
   <h1 className="text-3xl font-bold font-mono tracking-tight text-foreground mt-8 mb-4 border-b border-border pb-2">
@@ -19,8 +36,8 @@ const H1 = ({ children }: MdxComponentProps) => (
 );
 
 const H2 = ({ children }: MdxComponentProps) => {
-  // Generate an ID for Table of Contents tracking
-  const id = children?.toString().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "") || "";
+  const rawText = extractTextFromNode(children);
+  const id = slugifyHeading(rawText);
   
   return (
     <h2 id={id} className="text-2xl font-bold font-mono text-foreground mt-8 mb-3 flex items-center gap-2 group scroll-mt-20">
@@ -30,11 +47,16 @@ const H2 = ({ children }: MdxComponentProps) => {
   );
 };
 
-const H3 = ({ children }: MdxComponentProps) => (
-  <h3 className="text-xl font-bold font-mono text-foreground mt-6 mb-2">
-    {children}
-  </h3>
-);
+const H3 = ({ children }: MdxComponentProps) => {
+  const rawText = extractTextFromNode(children);
+  const id = slugifyHeading(rawText);
+
+  return (
+    <h3 id={id} className="text-xl font-bold font-mono text-foreground mt-6 mb-2 scroll-mt-24">
+      {children}
+    </h3>
+  );
+};
 
 interface MdxParagraphProps extends React.HTMLAttributes<HTMLParagraphElement> {
   align?: string;
@@ -119,8 +141,8 @@ const Pre = ({ children }: MdxComponentProps) => {
   const language = className.replace(/language-/, "") || "bash";
 
   return (
-    <div className="terminal-window border border-border rounded-xl my-6 bg-[#0c0f12] overflow-hidden shadow-lg">
-      <div className="terminal-header bg-[#12161a] border-b border-border/80 px-4 py-2 flex items-center justify-between">
+    <div className="terminal-window border border-border rounded-xl my-6 bg-slate-50 dark:bg-[#0c0f12] overflow-hidden shadow-sm dark:shadow-lg theme-transition">
+      <div className="terminal-header bg-slate-100/90 dark:bg-[#12161a] border-b border-border px-4 py-2 flex items-center justify-between theme-transition">
         <div className="terminal-dots flex gap-1.5">
           <div className="terminal-dot red w-3 h-3 rounded-full bg-[#ff5f56]" />
           <div className="terminal-dot yellow w-3 h-3 rounded-full bg-[#ffbd2e]" />
@@ -132,13 +154,35 @@ const Pre = ({ children }: MdxComponentProps) => {
         <CopyButton text={codeText.trim()} />
       </div>
       <div className="terminal-content">
-        <pre className="terminal-pre p-4 overflow-x-auto text-[13px] font-mono leading-relaxed text-slate-200">
+        <pre className="terminal-pre p-4 overflow-x-auto text-[13px] font-mono leading-relaxed text-slate-800 dark:text-slate-200">
           <code className={`terminal-code ${className}`}>
             {highlightPrompt(codeText, language)}
           </code>
         </pre>
       </div>
     </div>
+  );
+};
+
+const Img = ({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
+  if (typeof src === "string" && src.includes("img.shields.io")) {
+    return <img src={src} alt={alt || ""} className="inline-block mx-1 align-middle" {...props} />;
+  }
+  return (
+    <span className="block my-6 overflow-hidden rounded-xl border border-border/80 bg-muted/20 shadow-md">
+      <img
+        src={src}
+        alt={alt || "Writeup screenshot"}
+        className="w-full h-auto object-contain rounded-xl max-h-[650px] mx-auto block"
+        loading="lazy"
+        {...props}
+      />
+      {alt && alt !== "web-img" && (
+        <span className="block text-center text-xs text-muted-foreground font-mono py-2 bg-muted/40 border-t border-border/60">
+          {alt}
+        </span>
+      )}
+    </span>
   );
 };
 
@@ -153,6 +197,7 @@ const components = {
   a: A,
   blockquote: Blockquote,
   pre: Pre,
+  img: Img,
 };
 
 interface MdxContentProps {

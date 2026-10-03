@@ -1,23 +1,36 @@
 /* Cyberpunk-Terminal Hacking Syntax Highlighting Theme */
+/* Fully Theme-Aware: Crisp Light Terminal in Light Mode, Authentic Cyber Terminal in Dark Mode */
 
 /* Code block wrapper (represented as a terminal pane) */
 .terminal-window {
   margin: 1.5rem 0;
   border-radius: 12px;
-  border: 1px border var(--border);
+  border: 1px solid var(--border);
+  background-color: #f8fafc;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.dark .terminal-window {
   background-color: #0c0f12;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
-  overflow: hidden;
 }
 
 .terminal-header {
   height: 38px;
   padding: 0 16px;
-  background-color: #12161a;
-  border-b: 1px solid var(--border);
+  background-color: #f1f5f9;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.dark .terminal-header {
+  background-color: #12161a;
+  border-bottom: 1px solid var(--border);
 }
 
 .terminal-dots {
@@ -52,26 +65,31 @@
   padding: 1.25rem !important;
   background-color: transparent !important;
   font-family: var(--font-mono), monospace !important;
-  font-size: 14px !important;
+  font-size: 13px !important;
   line-height: 1.6 !important;
   overflow-x: auto !important;
 }
 
 .terminal-code {
   font-family: var(--font-mono), monospace !important;
-  color: #e2e8f0;
+  color: #0f172a;
   background: transparent !important;
   padding: 0 !important;
+  transition: color 0.3s ease;
+}
+
+.dark .terminal-code {
+  color: #e2e8f0;
 }
 
 /* Copy Button styles */
 .copy-btn {
-  padding: 6px 12px;
+  padding: 5px 10px;
   font-family: var(--font-mono), monospace;
   font-size: 11px;
   font-weight: 600;
   color: var(--muted-foreground);
-  background-color: #1a2026;
+  background-color: #ffffff;
   border: 1px solid var(--border);
   border-radius: 6px;
   cursor: pointer;
@@ -83,27 +101,52 @@
 
 .copy-btn:hover {
   color: var(--foreground);
+  background-color: #f8fafc;
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--border-glow);
+}
+
+.dark .copy-btn {
+  background-color: #1a2026;
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+.dark .copy-btn:hover {
+  color: var(--foreground);
+  background-color: #202730;
   border-color: var(--accent);
   box-shadow: 0 0 10px var(--border-glow);
 }
 
 .copy-btn.copied {
-  color: var(--background);
-  background-color: var(--accent);
-  border-color: var(--accent);
+  color: #ffffff !important;
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
 }
 
-/* Token Styles (Prism Compatibility) */
+/* Command Prompt Highlighting */
+.command-prompt {
+  color: #059669;
+  font-weight: bold;
+  user-select: none;
+}
+
+.dark .command-prompt {
+  color: #00e599;
+}
+
+/* Light Theme Tokens (High Contrast, Crisp) */
 .token.comment,
 .token.prolog,
 .token.doctype,
 .token.cdata {
-  color: #5d6e80;
+  color: #64748b;
   font-style: italic;
 }
 
 .token.punctuation {
-  color: #94a3b8;
+  color: #334155;
 }
 
 .token.property,
@@ -113,7 +156,7 @@
 .token.constant,
 .token.symbol,
 .token.deleted {
-  color: #c084fc; /* soft purple */
+  color: #7c3aed;
 }
 
 .token.selector,
@@ -122,7 +165,7 @@
 .token.char,
 .token.builtin,
 .token.inserted {
-  color: #38bdf8; /* light blue/cyan */
+  color: #0284c7;
 }
 
 .token.operator,
@@ -130,25 +173,25 @@
 .token.url,
 .language-css .token.string,
 .style .token.string {
-  color: #2dd4bf; /* teal */
+  color: #0d9488;
 }
 
 .token.atrule,
 .token.attr-value,
 .token.keyword {
-  color: #00e599; /* signature green */
+  color: #059669;
   font-weight: bold;
 }
 
 .token.function,
 .token.class-name {
-  color: #60a5fa; /* sky blue */
+  color: #2563eb;
 }
 
 .token.regex,
 .token.important,
 .token.variable {
-  color: #fb7185; /* soft rose */
+  color: #e11d48;
 }
 
 .token.important,
@@ -159,11 +202,80 @@
   font-style: italic;
 }
 
-/* Command Prompt Highlighting */
-.command-prompt {
+/* Dark Theme Tokens (Vibrant Cyber Neon) */
+.dark .token.comment,
+.dark .token.prolog,
+.dark .token.doctype,
+.dark .token.cdata {
+  color: #5d6e80;
+  font-style: italic;
+}
+
+.dark .token.punctuation {
+  color: #94a3b8;
+}
+
+.dark .token.property,
+.dark .token.tag,
+.dark .token.boolean,
+.dark .token.number,
+.dark .token.constant,
+.dark .token.symbol,
+.dark .token.deleted {
+  color: #c084fc;
+}
+
+.dark .token.selector,
+.dark .token.attr-name,
+.dark .token.string,
+.dark .token.char,
+.dark .token.builtin,
+.dark .token.inserted {
+  color: #38bdf8;
+}
+
+.dark .token.operator,
+.dark .token.entity,
+.dark .token.url,
+.dark .language-css .token.string,
+.dark .style .token.string {
+  color: #2dd4bf;
+}
+
+.dark .token.atrule,
+.dark .token.attr-value,
+.dark .token.keyword {
   color: #00e599;
   font-weight: bold;
-  user-select: none;
+}
+
+.dark .token.function,
+.dark .token.class-name {
+  color: #60a5fa;
+}
+
+.dark .token.regex,
+.dark .token.important,
+.dark .token.variable {
+  color: #fb7185;
+}
+
+/* Inline Code in Writeup Content */
+.mdx-content :not(pre) > code {
+  background-color: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.875em;
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.dark .mdx-content :not(pre) > code {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #00e599;
+  border: 1px solid var(--border);
 }
 
 /* Fix Shields.io/Markdown badges alignment in single inline block line */
@@ -173,4 +285,3 @@
   vertical-align: middle;
   border-radius: 4px;
 }
-

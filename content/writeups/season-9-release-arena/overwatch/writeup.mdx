@@ -108,6 +108,8 @@ Nmap done
 
 ## Step 2 - Enumeration
 
+### Anonymous SMB NULL Session & Hardcoded Database Credentials
+
 - 🔍 *First Lets look at the SMB service, if it has NULL Session Allowed or not*
 
 ```bash
@@ -360,6 +362,8 @@ SQL (OVERWATCH\sqlsvc  guest@master)>
 
 ## Step 3 - Initial Foothold
 
+### MSSQL Linked Server Dynamic DNS Poisoning
+
 - 🔍 *Lets First Add the DNS record*
 
 ```bash
@@ -410,6 +414,8 @@ ERROR(MSOLEDBSQL): Line 0: TCP Provider: An existing connection was forcibly clo
 - **USER:** sqlmgmt
 - **PASS:** bIhBbzMMnB82yx
 
+### Evil-WinRM Authentication as sqlmgmt & User Flag
+
 - 🔍 *Now Lets see if we can access Evil-winrm, well obviously we cam, because while enumerating i have seen that sqlmgmt is in Remote Management Group*
 
 ```bash
@@ -452,6 +458,8 @@ Mode                 LastWriteTime         Length Name
 ---
 
 ## Step 4 - Privilege Escalation
+
+### Privileged SOAP Service Command Injection to SYSTEM
 
 - 🔍 *While Running WinPEASE, could not found anything useful*
 - 🔍 *From decompiled code, MonitoringService.KillProcess method ran:*
@@ -514,6 +522,8 @@ Local Group Memberships      *Administrators
 Global Group memberships     *Domain Users
 The command completed successfully.
 ```
+
+### Impacket Secretsdump SAM & LSA Hash Extraction to SYSTEM
 
 - 🔍 *Great, User is Added, lets dump the hashes now*
 

@@ -159,6 +159,8 @@ _laurel:x:101:988::/var/log/laurel:/bin/false
 > - `~/.ssh/id_ed25519` — Ed25519 key (modern, recommended)
 > - `~/.ssh/identity` — Old format
 
+### SSH Private Key Exfiltration & John the Ripper Cracking
+
 - 🔍 *When trying each location, we find that an Ed25519 key is present at `http://target/admin/media/download_private_file?file=../../../../home/trivia/.ssh/id_ed25519`.*
 - 🔍 *(Tip: Use Burp Suite instead of directly sending the request via the browser).*
 

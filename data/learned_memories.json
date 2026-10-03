@@ -1,0 +1,133 @@
+[
+  {
+    "topic": "NTLM Relay",
+    "category": "exploit_tradecraft",
+    "insight": "The --remove-mic flag exploits CVE-2019-1040 by stripping the MIC and clearing signing negotiation flags to bypass NTLM integrity checks during relay attacks.",
+    "source": "user_prompt",
+    "contextSnippet": "give me a reference of ---remove-mic flag from rohit's writeup",
+    "id": "mem-1789801925167-mi1ge",
+    "timestamp": "2026-09-19T07:12:05.167Z"
+  },
+  {
+    "topic": "NTLM Relay",
+    "category": "exploit_tradecraft",
+    "insight": "The --remove-mic flag surgically zeros the MIC field and clears NTLMSSP negotiation flags to bypass NTLM integrity checks during relay attacks.",
+    "source": "user_prompt",
+    "contextSnippet": "tell me is there any reference of --remove-mic flag from rohit's writeups?",
+    "id": "mem-1789801442430-elq64",
+    "timestamp": "2026-09-19T07:04:02.430Z"
+  },
+  {
+    "topic": "NTLM Relay",
+    "category": "exploit_tradecraft",
+    "insight": "The --remove-mic flag surgically zeros the MIC field and clears NTLM signing negotiation flags to bypass integrity checks during NTLM relay attacks.",
+    "source": "user_prompt",
+    "contextSnippet": "Explain the technical exploit mechanics and defensive mitigation for ntlmrelayx.py: --remove-mic (Dr",
+    "id": "mem-1789799002059-c9nev",
+    "timestamp": "2026-09-19T06:23:22.059Z"
+  },
+  {
+    "topic": "AD_Methodology",
+    "category": "exploit_tradecraft",
+    "insight": "Rohit consistently employs a structured exploitation pipeline: nxc for validation, bloodyAD for attribute mapping, and Impacket for Kerberos ticket manipulation.",
+    "source": "user_prompt",
+    "contextSnippet": "could you scan if this current writeup has something common part that is common across all the windo",
+    "id": "mem-1789199766994-j1v6o",
+    "timestamp": "2026-09-12T07:56:06.994Z"
+  },
+  {
+    "topic": "AD_Methodology",
+    "category": "exploit_tradecraft",
+    "insight": "Rohit's Windows exploitation methodology consistently follows a structured pipeline of nxc credential validation, bloodyAD attribute enumeration, and Impacket-based Kerberos ticket manipulation.",
+    "source": "user_prompt",
+    "contextSnippet": "could you scan if this current writeup has something common part that is common across all the windo",
+    "id": "mem-1789199727902-wbgxg",
+    "timestamp": "2026-09-12T07:55:27.902Z"
+  },
+  {
+    "topic": "AD_Enumeration_Pattern",
+    "category": "exploit_tradecraft",
+    "insight": "Rohit consistently prioritizes 'nxc' credential verification followed by 'bloodyAD' attribute enumeration to identify logical AD attack paths.",
+    "source": "user_prompt",
+    "contextSnippet": "could you scan if this current writeup has something common part that is common across all the windo",
+    "id": "mem-1789199624596-jjrpn",
+    "timestamp": "2026-09-12T07:53:44.596Z"
+  },
+  {
+    "topic": "Pirate",
+    "category": "exploit_tradecraft",
+    "insight": "PetitPotam coercion forces NTLM authentication which, when relayed via CVE-2019-1040, allows for RBCD configuration and S4U2Proxy impersonation of Domain Admins.",
+    "source": "user_prompt",
+    "contextSnippet": "explain me about the Privilege Escalation of this machine in easy terms",
+    "id": "mem-1789198504286-622oj",
+    "timestamp": "2026-09-12T07:35:04.286Z"
+  },
+  {
+    "topic": "MSSQL Linked Server",
+    "category": "exploit_tradecraft",
+    "insight": "When a linked server is accessed, the database engine attempts NTLM authentication, which can be intercepted if the DNS resolution is poisoned to point to an attacker-controlled listener.",
+    "source": "user_prompt",
+    "contextSnippet": "buddy! explain me about this MSSQL Linked DNS Poisoning and how to perform it. step by step and in e",
+    "id": "mem-1789196336303-728rw",
+    "timestamp": "2026-09-12T06:58:56.303Z"
+  },
+  {
+    "topic": "CCTV",
+    "category": "exploit_tradecraft",
+    "insight": "Initial foothold is achieved via authenticated ZoneMinder SQLi (CVE-2024-51428) in the 'tid' parameter of the removetag action, dumping the 'zm' database to crack user 'mark' bcrypt hash for SSH access.",
+    "source": "writeup_grounding",
+    "contextSnippet": "explain me the initial foothold and how to perform it with commands",
+    "id": "mem-1789194212987-o0147",
+    "timestamp": "2026-09-12T06:23:32.987Z"
+  },
+  {
+    "topic": "dzcampaigns.htb",
+    "category": "image_intelligence",
+    "insight": "The target is suspected to be vulnerable to CVE-2026-33937 (Handlebars RCE) via JSON object injection into the template compilation process.",
+    "source": "image_analysis",
+    "contextSnippet": "someone from my IRC chat told me to focus on CVE-2026-33937 vulnerability for further attack plan.",
+    "id": "mem-1788935776043-ns3fw",
+    "timestamp": "2026-09-09T06:36:16.043Z"
+  },
+  {
+    "topic": "dzcampaigns.htb",
+    "category": "image_intelligence",
+    "insight": "The target utilizes a CSRF-protected POST endpoint at /character/{id} which is susceptible to potential XSS/Template Injection via the 'name' parameter.",
+    "source": "image_analysis",
+    "contextSnippet": "what is this image. please explain me about this",
+    "id": "mem-1788935559324-5zrtp",
+    "timestamp": "2026-09-09T06:32:39.324Z"
+  },
+  {
+    "id": "mem-seed-1",
+    "timestamp": "2026-04-10T12:00:00.000Z",
+    "topic": "CCTV",
+    "category": "machine_target",
+    "insight": "CCTV machine features authenticated ZoneMinder SQLi (CVE-2024-51428) in the 'tid' parameter of the removetag action to dump user hashes and SSH in as mark, followed by motionEye command injection (CVE-2025-60787) via unauthenticated local API for root privesc.",
+    "source": "system"
+  },
+  {
+    "id": "mem-seed-2",
+    "timestamp": "2026-04-12T14:30:00.000Z",
+    "topic": "Pirate",
+    "category": "machine_target",
+    "insight": "Pirate is a Windows Server 2019 Active Directory machine vulnerable to PetitPotam NTLM relay and Resource-Based Constrained Delegation (RBCD) to compromise the domain controller.",
+    "source": "system"
+  },
+  {
+    "id": "mem-seed-3",
+    "timestamp": "2026-04-15T09:15:00.000Z",
+    "topic": "VariaType",
+    "category": "machine_target",
+    "insight": "VariaType exploits an exposed Git repo, fontTools CDATA XML Injection (CVE-2025-66034) for foothold, and setuptools PackageIndex path traversal (CVE-2025-47273) for root.",
+    "source": "system"
+  },
+  {
+    "id": "mem-seed-4",
+    "timestamp": "2026-04-18T18:45:00.000Z",
+    "topic": "Burp Suite",
+    "category": "tool_syntax",
+    "insight": "When analyzing multipart form file uploads, tampering the Content-Type header or injecting trailing null bytes/alternate extensions can bypass simple mime checking.",
+    "source": "system"
+  }
+]

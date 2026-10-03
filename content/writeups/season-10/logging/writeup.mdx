@@ -399,6 +399,8 @@ IndexError: list index out of range
 
 ## Step 2 - Initial Foothold
 
+### Shadow Credentials on msa_health$ (bloodyAD)
+
 - 🔍 *Since we have `GenericWrite` over `msa_health$`, we execute the Shadow Credentials attack using `bloodyAD`:*
 
 ```bash
@@ -513,6 +515,8 @@ Get-Content "C:\ProgramData\UpdateMonitor\Logs\monitor.log"
 [2026-04-16 16:41:18] Failed to load settings_update.dll. Error code: 126
 ```
 
+### DLL Sideloading via UpdateMonitor (jaylee.clifton Foothold)
+
 - 🔍 *The executable attempts to unzip `Settings_Update.zip` from `C:\ProgramData\UpdateMonitor\` and load `settings_update.dll` from the `bin` subdirectory. Since we can write to `C:\ProgramData\UpdateMonitor`, we can hijack this process with DLL Sideloading.*
 
 > [!IMPORTANT]
@@ -589,6 +593,8 @@ Server username: logging\jaylee.clifton
 
 ## Step 3 - Privilege Escalation
 
+### Rubeus TGT Delegation & Kerberos Ticket Extraction
+
 - 🔍 *Since the Meterpreter shell has limitations, we need to extract a delegation TGT for `jaylee.clifton` using `Rubeus.exe`:*
 - 🔍 *We upload `Rubeus.exe` to `C:\temp\`:*
 
@@ -655,6 +661,8 @@ Valid starting       Expires              Service principal
 04/24/2026 21:37:08  04/25/2026 07:32:15  krbtgt/LOGGING.HTB@LOGGING.HTB
         renew until 05/01/2026 21:32:15
 ```
+
+### ADCS ESC17 - Rogue WSUS Server Spoofing
 
 - 🔍 *Now we enumerate Active Directory Certificate Services (ADCS) templates:*
 

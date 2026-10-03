@@ -91,6 +91,8 @@ Nmap done: 1 IP address (1 host up) scanned in 98.18 seconds
 
 ## Step 2 - Initial Foothold
 
+### Authenticated ZoneMinder SQL Injection (CVE-2024-51428)
+
 - 🔍 *We test the authenticated SQL injection vulnerability (CVE-2024-51428) targeting the `tid` parameter with `sqlmap`:*
 
 ```bash
@@ -176,6 +178,8 @@ Table: Users
 +-------------------------------------------------------------------------+
 ```
 
+### Hashcat Bcrypt Password Cracking & SSH Access
+
 - 🔍 *We crack the bcrypt hash using Hashcat:*
 
 ```bash
@@ -208,6 +212,8 @@ mark@cctv:~$
 
 ## Step 3 - Privilege Escalation
 
+### motionEye Configuration Command Injection (CVE-2025-60787)
+
 - 🔍 *We run system enumeration (e.g. linPEAS) and discover a local `motioneye` service instance running on port 8765:*
 
 ```text
@@ -215,6 +221,8 @@ tcp        0      0 127.0.0.1:8765          0.0.0.0:*               LISTEN
 motioneye.service                        loaded active running motionEye Server
  └─ RUNS_AS_ROOT: Service runs as root
 ```
+
+### Chisel Local Port Forwarding for Internal motionEye
 
 - 🔍 *The service runs as root. Since port 8765 only binds to localhost, we tunnel it using `chisel`:*
 

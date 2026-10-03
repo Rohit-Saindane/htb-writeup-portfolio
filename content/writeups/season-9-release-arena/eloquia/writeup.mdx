@@ -46,6 +46,8 @@ summary: '---'
 
 ## Step 2 - Initial Foothold
 
+### SQLite load_extension() Arbitrary DLL Execution
+
 - 🔍 *while exploring the admin panel we can see some utilities, as SQL Explorer, which execute SQL commands.*
 
 ### Checking the SQL Version
@@ -217,6 +219,8 @@ eloquia\web
 
 ## Step 6 - Dumping the Credentials
 
+### DPAPI Saved Browser Credential Extraction
+
 - 🔍 *While Enumerating the Shell, I saw that the Microsoft Edge Folder located at `C:\Users\web\AppData\Local\Microsoft\Edge\User Data\Default` contains credentials.*
 
 - 🔍 *Key files found:*
@@ -367,6 +371,8 @@ C:\Program Files\Python311>python C:\Web\Temp\Decrypt.py
 
 ## Step 7 - Privilege Escalation
 
+### Writable Failure2Ban Service Binary Hijack
+
 - 🔍 *Now that we have valid Creds dumped, lets try getting a Winrm Session for that user.*
 
 ```bash
@@ -442,7 +448,7 @@ Failure2Ban.exe BUILTIN\Administrators ELOQUIA\Olivia.KAT Allow  Write, ReadAndE
 > 4. Set up a Netcat Listener.
 > 5. Repeatedly overwrite the content of the service `Failure2Ban.exe` with `Failure.exe`.
 
-### Execution
+### Failure2Ban Service Binary Hijacking & Exploitation
 
 #### 1. Create Exploit.c
 

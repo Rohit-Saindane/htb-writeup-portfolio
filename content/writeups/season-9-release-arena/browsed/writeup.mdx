@@ -172,6 +172,8 @@ Running command: timeout 10s xvfb-run /opt/chrome-linux64/chrome --disable-gpu -
 
 ## Step 3 - Initial Foothold
 
+### Headless Chrome SSRF via --no-sandbox
+
 > [!NOTE]
 > Create a python script for creating a crafted zip file with reverse shell payload
 
@@ -259,6 +261,8 @@ larry@browsed:~/markdownPreview$
 ```
 
 ## Step 4 - Privilege Escalation
+
+### Python __pycache__ Bytecode Poisoning Escalation
 
 - 🔍 *sudo -l*
 

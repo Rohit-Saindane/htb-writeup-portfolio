@@ -2,15 +2,15 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="w-full border-t border-border bg-background py-6 mt-auto theme-transition">
+    <footer className="w-full border-t border-border bg-background pt-6 pb-20 sm:py-6 mt-auto theme-transition">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
         {/* Left Side: Copyright */}
         <div className="text-sm font-mono text-muted-foreground text-center sm:text-left">
           © {currentYear} Rohit Saindane
         </div>
 
-        {/* Right Side: Social Media Icons/Links */}
-        <div className="flex items-center gap-6">
+        {/* Right Side: Social Media Icons/Links with generous clearance from the floating assistant */}
+        <div className="flex items-center gap-6 sm:mr-52 md:mr-56">
           {/* GitHub Inline SVG */}
           <a
             href="https://github.com/Rohit-Saindane"
@@ -64,7 +64,7 @@ export default function Footer() {
 
           {/* Mail Inline SVG */}
           <a
-            href="mailto:rohitsaindane@example.com"
+            href="mailto:rohitsaindane36@gmail.com"
             className="flex items-center gap-1.5 text-sm font-mono text-muted-foreground hover:text-accent theme-transition cursor-pointer"
             id="footer-mail-link"
           >

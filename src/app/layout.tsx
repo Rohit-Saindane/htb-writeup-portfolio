@@ -5,6 +5,8 @@ import "../styles/prism-hacker.css";
 import { Providers } from "./providers";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import SearchModal from "@/components/SearchModal";
+import CyberAssistant from "@/components/CyberAssistant";
 
 const sansFont = Inter({
   subsets: ["latin"],
@@ -22,6 +24,11 @@ export const metadata: Metadata = {
   title: "Rohit Saindane | Cybersecurity Portfolio & Writeups",
   description:
     "Professional cybersecurity portfolio documenting Hack The Box machine writeups, offensive security research, and penetration testing walkthroughs.",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -38,6 +45,8 @@ export default function RootLayout({
           <Navbar />
           <main className="flex-grow flex flex-col">{children}</main>
           <Footer />
+          <SearchModal />
+          <CyberAssistant />
         </Providers>
       </body>
     </html>
