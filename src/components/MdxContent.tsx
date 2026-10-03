@@ -1,5 +1,6 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
 import React from "react";
+import remarkGfm from "remark-gfm";
 import CopyButton from "./CopyButton";
 
 interface MdxComponentProps {
@@ -186,6 +187,56 @@ const Img = ({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) 
   );
 };
 
+const Table = ({ children }: MdxComponentProps) => (
+  <div className="table-container my-6 w-full overflow-x-auto rounded-xl border border-border/80 bg-card/60 shadow-md backdrop-blur-sm">
+    <table className="w-full border-collapse text-left text-sm font-sans">
+      {children}
+    </table>
+  </div>
+);
+
+const Thead = ({ children }: MdxComponentProps) => (
+  <thead className="border-b border-border bg-muted/70 text-xs font-mono uppercase tracking-wider text-foreground">
+    {children}
+  </thead>
+);
+
+const Tbody = ({ children }: MdxComponentProps) => (
+  <tbody className="divide-y divide-border/50 font-sans text-muted-foreground">
+    {children}
+  </tbody>
+);
+
+const Tr = ({ children }: MdxComponentProps) => (
+  <tr className="transition-colors hover:bg-accent/5">
+    {children}
+  </tr>
+);
+
+const Th = ({ children }: MdxComponentProps) => (
+  <th className="px-4 py-3.5 font-semibold text-foreground whitespace-nowrap">
+    {children}
+  </th>
+);
+
+const Td = ({ children }: MdxComponentProps) => (
+  <td className="px-4 py-3 align-top leading-relaxed text-slate-700 dark:text-slate-300">
+    {children}
+  </td>
+);
+
+const Code = ({ children, className }: React.HTMLAttributes<HTMLElement>) => {
+  // If it's code inside a pre block, let Pre handle it
+  if (className?.includes("language-")) {
+    return <code className={className}>{children}</code>;
+  }
+  return (
+    <code className="rounded bg-muted/80 px-1.5 py-0.5 font-mono text-[13px] text-accent border border-border/50">
+      {children}
+    </code>
+  );
+};
+
 const components = {
   h1: H1,
   h2: H2,
@@ -198,6 +249,13 @@ const components = {
   blockquote: Blockquote,
   pre: Pre,
   img: Img,
+  table: Table,
+  thead: Thead,
+  tbody: Tbody,
+  tr: Tr,
+  th: Th,
+  td: Td,
+  code: Code,
 };
 
 interface MdxContentProps {
@@ -207,7 +265,16 @@ interface MdxContentProps {
 export default function MdxContent({ source }: MdxContentProps) {
   return (
     <div className="mdx-content prose dark:prose-invert max-w-none">
-      <MDXRemote source={source} components={components} />
+      <MDXRemote
+        source={source}
+        components={components}
+        options={{
+          mdxOptions: {
+            remarkPlugins: [remarkGfm],
+          },
+        }}
+      />
     </div>
   );
 }
+
