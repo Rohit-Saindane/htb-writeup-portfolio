@@ -86,24 +86,6 @@ export default function WriteupDeepLink() {
         top: Math.max(0, offsetPosition),
         behavior: "smooth",
       });
-
-      // Visual Cyber Accent Pulse
-      finalEl.classList.add("cyber-target-highlight");
-      const prevOutline = finalEl.style.outline;
-      const prevShadow = finalEl.style.boxShadow;
-      const prevBg = finalEl.style.backgroundColor;
-
-      finalEl.style.transition = "all 0.35s ease";
-      finalEl.style.outline = "2px solid #00e599";
-      finalEl.style.boxShadow = "0 0 25px rgba(0, 229, 153, 0.4)";
-      finalEl.style.backgroundColor = "rgba(0, 229, 153, 0.1)";
-
-      setTimeout(() => {
-        finalEl.style.outline = prevOutline;
-        finalEl.style.boxShadow = prevShadow;
-        finalEl.style.backgroundColor = prevBg;
-        finalEl.classList.remove("cyber-target-highlight");
-      }, 3500);
     }
   }, []);
 

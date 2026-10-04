@@ -1575,19 +1575,6 @@ function formatInline(text: string): React.ReactNode {
                 const navOffset = 90;
                 const offsetPosition = el.getBoundingClientRect().top + window.pageYOffset - navOffset;
                 window.scrollTo({ top: Math.max(0, offsetPosition), behavior: "smooth" });
-                el.classList.add("cyber-target-highlight");
-                el.style.transition = "all 0.35s ease";
-                el.style.outline = "2px solid #00e599";
-                el.style.boxShadow = "0 0 25px rgba(0, 229, 153, 0.4)";
-                el.style.backgroundColor = "rgba(0, 229, 153, 0.1)";
-                setTimeout(() => {
-                  if (el) {
-                    el.style.outline = "";
-                    el.style.boxShadow = "";
-                    el.style.backgroundColor = "";
-                    el.classList.remove("cyber-target-highlight");
-                  }
-                }, 3500);
               }
             }
           };
