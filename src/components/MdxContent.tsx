@@ -73,19 +73,19 @@ const P = ({ children, align, ...props }: MdxParagraphProps) => {
 };
 
 const UL = ({ children }: MdxComponentProps) => (
-  <ul className="list-disc list-inside space-y-1.5 mb-4 text-muted-foreground font-sans pl-2">
+  <ul className="list-disc list-outside space-y-2 mb-4 text-muted-foreground font-sans ml-6">
     {children}
   </ul>
 );
 
 const OL = ({ children }: MdxComponentProps) => (
-  <ol className="list-decimal list-inside space-y-1.5 mb-4 text-muted-foreground font-sans pl-2">
+  <ol className="list-decimal list-outside space-y-2 mb-4 text-muted-foreground font-sans ml-6">
     {children}
   </ol>
 );
 
 const LI = ({ children }: MdxComponentProps) => (
-  <li className="text-base text-muted-foreground leading-relaxed pl-1">
+  <li className="text-base text-muted-foreground leading-relaxed pl-1.5 [&>p]:inline [&>p]:mb-0 [&>p+p]:block [&>p+p]:mt-1">
     {children}
   </li>
 );
