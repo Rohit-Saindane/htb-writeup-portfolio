@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import "../styles/prism-hacker.css";
 import { Providers } from "./providers";
@@ -8,14 +8,56 @@ import Footer from "@/components/Footer";
 import SearchModal from "@/components/SearchModal";
 import CyberAssistant from "@/components/CyberAssistant";
 
-const sansFont = Inter({
-  subsets: ["latin"],
+const sansFont = localFont({
+  src: [
+    {
+      path: "./fonts/Inter-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/Inter-Medium.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "./fonts/Inter-SemiBold.woff2",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "./fonts/Inter-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
   variable: "--font-sans",
   display: "swap",
 });
 
-const monoFont = JetBrains_Mono({
-  subsets: ["latin"],
+const monoFont = localFont({
+  src: [
+    {
+      path: "./fonts/JetBrainsMono-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/JetBrainsMono-Medium.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "./fonts/JetBrainsMono-SemiBold.woff2",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "./fonts/JetBrainsMono-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
   variable: "--font-mono",
   display: "swap",
 });
