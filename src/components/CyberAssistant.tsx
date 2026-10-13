@@ -29,16 +29,16 @@ import {
   BookOpen,
 } from "lucide-react";
 
-function PrismIcon({ className = "w-5 h-5", activeColor = "#00e599" }: { className?: string; activeColor?: string }) {
+function PrismIcon({ className = "w-8 h-8", activeColor = "#00e599" }: { className?: string; activeColor?: string }) {
   return (
     <svg
-      viewBox="0 0 28 28"
+      viewBox="0 0 36 36"
       className={className}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        <linearGradient id="prismGlassGrad" x1="6" y1="4" x2="20" y2="24" gradientUnits="userSpaceOnUse">
+        <linearGradient id="prismGlassGrad" x1="9" y1="6" x2="29" y2="28" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#ffffff" stopOpacity="0.45" />
           <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.2" />
           <stop offset="100%" stopColor={activeColor} stopOpacity="0.35" />
@@ -47,34 +47,34 @@ function PrismIcon({ className = "w-5 h-5", activeColor = "#00e599" }: { classNa
 
       {/* Incident White Light Beam entering from left (1 writeup) */}
       <path
-        d="M2 14L10 14"
+        d="M3 18L14 18"
         stroke="#ffffff"
-        strokeWidth="1.8"
+        strokeWidth="2"
         strokeLinecap="round"
         className="opacity-95"
       />
 
       {/* Triangular Prism Glass Body */}
       <polygon
-        points="14,4 6,23 22,23"
+        points="19,6 9,28 29,28"
         fill="url(#prismGlassGrad)"
-        stroke="rgba(255,255,255,0.75)"
-        strokeWidth="1.2"
+        stroke="rgba(255,255,255,0.85)"
+        strokeWidth="1.4"
         strokeLinejoin="round"
       />
-      <line x1="14" y1="4" x2="14" y2="23" stroke="rgba(255,255,255,0.25)" strokeWidth="0.8" />
+      <line x1="19" y1="6" x2="19" y2="28" stroke="rgba(255,255,255,0.3)" strokeWidth="0.8" />
 
       {/* Refracted Spectrum Rays exiting to the right: 5 modes */}
       {/* Red (Attack) */}
-      <path d="M16 11.5L26 6" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M22 14L34 7" stroke="#ef4444" strokeWidth="1.8" strokeLinecap="round" />
       {/* Yellow (Debug) */}
-      <path d="M17 13L26.5 10.5" stroke="#eab308" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M23 16L35 12" stroke="#eab308" strokeWidth="1.8" strokeLinecap="round" />
       {/* Emerald (General) */}
-      <path d="M17 14.5L27 14.5" stroke="#00e599" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M23.5 18L35.5 18" stroke="#00e599" strokeWidth="1.8" strokeLinecap="round" />
       {/* Blue (Defense) */}
-      <path d="M17 16L26.5 18.5" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M23 20L35 24" stroke="#3b82f6" strokeWidth="1.8" strokeLinecap="round" />
       {/* Purple (Tools) */}
-      <path d="M16 17.5L26 23" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M22 22L34 29" stroke="#a855f7" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -733,45 +733,25 @@ export default function CyberAssistant() {
           initial={{ opacity: 0, scale: 0.9, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40"
+          className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40"
         >
           <button
             onClick={() => {
               setIsOpen(true);
               setIsMinimized(false);
             }}
-            className="group relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-card dark:bg-[#0e1216] border border-border dark:border-[#20242b] text-foreground dark:text-[#e4e7eb] shadow-xl hover:shadow-[0_0_25px_rgba(0,229,153,0.2)] transition-all duration-200 cursor-pointer font-mono text-xs theme-transition"
+            className="group relative flex items-center justify-center w-[52px] h-[52px] sm:w-14 sm:h-14 rounded-2xl bg-card/95 dark:bg-[#0c1014]/95 backdrop-blur-md border border-border/80 dark:border-white/15 text-foreground shadow-2xl hover:shadow-[0_0_30px_rgba(0,229,153,0.35)] hover:border-accent/40 dark:hover:border-white/35 hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer p-0"
             style={{
-              borderColor: isStreaming ? `${activeModeMeta.hexColor}80` : undefined,
+              borderColor: isStreaming ? `${activeModeMeta.hexColor}90` : undefined,
             }}
             id="cyber-assistant-trigger"
-            title="Prism AI: Refracting 1 writeup into 5 specialized intelligence lenses"
+            title="Prism AI"
+            aria-label="Open Prism AI"
           >
-            {/* Prism Holographic Icon Container */}
-            <div className="relative flex items-center justify-center p-1.5 rounded-lg bg-black/40 border border-white/10 group-hover:border-white/30 transition-all shadow-inner">
-              <PrismIcon className="w-5 h-5 transition-transform group-hover:scale-110" activeColor={activeModeMeta.hexColor} />
-            </div>
-
-            <div className="flex flex-col text-left">
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-foreground dark:text-[#e4e7eb] tracking-tight group-hover:text-accent transition-colors font-mono text-xs">
-                  {isStreaming ? "prism refracting…" : "prism // daemon"}
-                </span>
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ backgroundColor: activeModeMeta.hexColor, boxShadow: `0 0 6px ${activeModeMeta.hexColor}` }}
-                />
-              </div>
-              <span className="text-[9px] text-muted-foreground font-mono -mt-0.5">
-                1 writeup → 5 spectrum modes
-              </span>
-            </div>
-
-            {writeupContext?.machineName && (
-              <span className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] rounded bg-muted/40 dark:bg-[#161b22] text-muted-foreground border border-border dark:border-[#20242b] font-mono">
-                {writeupContext.machineName}
-              </span>
-            )}
+            <PrismIcon
+              className="w-8 h-8 sm:w-9 sm:h-9 transition-transform duration-300 group-hover:scale-110"
+              activeColor={activeModeMeta.hexColor}
+            />
           </button>
         </motion.div>
       )}
@@ -863,7 +843,7 @@ export default function CyberAssistant() {
                   <div className="relative flex items-center justify-center p-1 rounded bg-black/30 border border-white/10">
                     <PrismIcon className="w-3.5 h-3.5" activeColor={activeModeMeta.hexColor} />
                   </div>
-                  <span className="font-semibold text-foreground dark:text-[#e4e7eb]">prism // daemon</span>
+                  <span className="font-semibold text-foreground dark:text-[#e4e7eb]">prism</span>
                   <span className="text-[10px] px-1.5 py-0.2 rounded bg-muted/30 dark:bg-[#161b22] text-muted-foreground border border-border dark:border-[#20242b]">
                     {activeModeMeta.shortLabel}
                   </span>
