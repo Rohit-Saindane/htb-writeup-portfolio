@@ -106,6 +106,44 @@ const MAX_REQUESTS = 60; // 60 requests per hour
 
 const MOCK_SEASONS: SeasonStatItem[] = [
   {
+    seasonId: 'season-12',
+    seasonName: 'Season 12',
+    tier: 'BRONZE TIER',
+    tierColor: '#cd7f32',
+    seasonalRank: '#1420',
+    tierProgress: 15.0,
+    points: 45,
+    flags: '2/26',
+    ownsUser: 1,
+    ownsRoot: 1,
+    machineDifficulties: [
+      { name: 'Easy', owned_machines: 0, total_machines: 165, completion_percentage: 0 },
+      { name: 'Medium', owned_machines: 1, total_machines: 196, completion_percentage: 0.51 },
+      { name: 'Hard', owned_machines: 0, total_machines: 124, completion_percentage: 0 },
+      { name: 'Insane', owned_machines: 0, total_machines: 70, completion_percentage: 0 }
+    ],
+    recentActivity: [
+      {
+        blood: false,
+        avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a2cc2776-5507-42ae-b9d0-3346ff823ce7-1789977190.png',
+        type: 'root',
+        id: 984,
+        name: 'Layover',
+        points: 30,
+        ownDate: '2026-10-01T15:59:21.000Z'
+      },
+      {
+        blood: false,
+        avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a2cc2776-5507-42ae-b9d0-3346ff823ce7-1789977190.png',
+        type: 'user',
+        id: 984,
+        name: 'Layover',
+        points: 15,
+        ownDate: '2026-10-01T15:52:01.000Z'
+      }
+    ]
+  },
+  {
     seasonId: 'season-11',
     seasonName: 'Season 11',
     tier: 'RUBY TIER',
@@ -123,13 +161,13 @@ const MOCK_SEASONS: SeasonStatItem[] = [
       { name: 'Insane', owned_machines: 1, total_machines: 68, completion_percentage: 1.47 }
     ],
     recentActivity: [
-      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1e513f0-690d-4dc2-bd2c-946d3983d026-1780052541.png', type: 'root', id: 912, name: 'Bedside', points: 30, ownDate: '2026-07-24T15:41:44.000Z' },
-      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1e513f0-690d-4dc2-bd2c-946d3983d026-1780052541.png', type: 'user', id: 912, name: 'Bedside', points: 15, ownDate: '2026-07-23T14:08:27.000Z' },
-      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1e514a2-69e8-4e79-82ab-176c3b5a26b4-1780052657.png', type: 'root', id: 915, name: 'Paperwork', points: 20, ownDate: '2026-07-18T14:45:38.000Z' },
-      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1e514a2-69e8-4e79-82ab-176c3b5a26b4-1780052657.png', type: 'user', id: 915, name: 'Paperwork', points: 10, ownDate: '2026-07-18T12:49:59.000Z' },
-      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1e5130b-96c5-4d6b-a7c3-aaa82554d1b2-1780052391.png', type: 'root', id: 909, name: 'DevHub', points: 30, ownDate: '2026-07-10T16:10:39.000Z' },
-      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1e5130b-96c5-4d6b-a7c3-aaa82554d1b2-1780052391.png', type: 'user', id: 909, name: 'DevHub', points: 15, ownDate: '2026-07-10T15:07:39.000Z' },
-      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1e513f0-690d-4dc2-bd2c-946d3983d026-1780052541.png', type: 'root', id: 905, name: 'Nimbus', points: 40, ownDate: '2026-07-02T11:20:00.000Z' }
+      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a22a6987-d3b2-4b23-a843-db9f38b06566-1783030428.png', type: 'root', id: 963, name: 'TrustFall', points: 50, ownDate: '2026-09-26T06:21:10.000Z' },
+      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a22a6987-d3b2-4b23-a843-db9f38b06566-1783030428.png', type: 'user', id: 963, name: 'TrustFall', points: 25, ownDate: '2026-09-25T14:46:14.000Z' },
+      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1fbe7ca-991c-43f1-b9da-e403d159bebe-1780052951.png', type: 'root', id: 955, name: 'Management', points: 20, ownDate: '2026-09-15T15:30:16.000Z' },
+      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1fbe7ca-991c-43f1-b9da-e403d159bebe-1780052951.png', type: 'user', id: 955, name: 'Management', points: 10, ownDate: '2026-09-14T18:40:53.000Z' },
+      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1fa5d74-ee5a-4712-a7d0-1c3132e0e4b7-1780052857.png', type: 'root', id: 948, name: 'Cohort', points: 20, ownDate: '2026-08-22T15:25:24.000Z' },
+      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1fa5d74-ee5a-4712-a7d0-1c3132e0e4b7-1780052857.png', type: 'user', id: 948, name: 'Cohort', points: 10, ownDate: '2026-08-19T15:10:18.000Z' },
+      { blood: false, avatar: 'https://cdn.services-k8s.prod.aws.htb.systems/content/machines/avatar/a1f59dae-2824-4f81-8178-5e8bf8345e52-1780052733.png', type: 'root', id: 942, name: 'DanglingTree', points: 30, ownDate: '2026-08-19T14:10:13.000Z' }
     ]
   },
   {
@@ -189,17 +227,17 @@ const MOCK_SEASONS: SeasonStatItem[] = [
 ];
 
 const MOCK_DATA: MappedHtbStats = {
-  rank: '#805',
-  rankPoints: 375,
-  currentSeasonRank: '#2536',
-  totalXP: 375,
+  rank: '#706',
+  rankPoints: 289,
+  currentSeasonRank: '#1420',
+  totalXP: 289,
   level: 59,
   levelXP: 79,
   levelMaxXP: 1743,
-  htbRankTitle: 'Professional',
+  htbRankTitle: 'Pro Hacker',
   grade: 3,
-  ownsUser: 50,
-  ownsRoot: 44,
+  ownsUser: 59,
+  ownsRoot: 53,
   hackingTeam: 'Apophis',
   userTag: 'Pro Hacker',
   userName: 'FluXi0n',
@@ -302,39 +340,63 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const userOwnsTotal = p.user_owns || 56;
-    const systemOwnsTotal = p.system_owns || 49;
-    const season11OwnsUser = 14;
-    const season11OwnsRoot = 14;
-    const seasonRankStr = p.current_season_ranking ? `#${p.current_season_ranking.toLocaleString()}` : '#2536';
-    const pointsVal = p.points || 375;
+    const userOwnsTotal = p.user_owns || 59;
+    const systemOwnsTotal = p.system_owns || 53;
+    const season12Rank = p.current_season_ranking ? `#${p.current_season_ranking.toLocaleString()}` : '#1420';
+    const season11Rank = '#2536';
+    const pointsVal = p.points || 289;
 
-    // Dynamic mapped seasons with live S11 overlay
+    // Partition recent activity: Layover and solves on/after 2026-10-01 belong to Season 12
+    const rawActivity = (recentActivity && recentActivity.length > 0) ? recentActivity : [];
+    const season12Activity = rawActivity.filter(
+      (a) => a.name.toLowerCase() === 'layover' || new Date(a.ownDate).getTime() >= new Date('2026-10-01T00:00:00.000Z').getTime()
+    );
+    const season11Activity = rawActivity.filter(
+      (a) => a.name.toLowerCase() !== 'layover' && new Date(a.ownDate).getTime() < new Date('2026-10-01T00:00:00.000Z').getTime()
+    );
+
+    // Dynamic mapped seasons (Season 12 active, Season 11 previous, Season 10, Season 9)
     const seasons: SeasonStatItem[] = [
       {
-        ...MOCK_SEASONS[0],
-        seasonalRank: seasonRankStr,
-        ownsUser: season11OwnsUser,
-        ownsRoot: season11OwnsRoot,
-        points: pointsVal,
+        ...MOCK_SEASONS[0], // Season 12
+        seasonalRank: season12Rank,
+        ownsUser: 1,
+        ownsRoot: 1,
+        points: 45,
+        flags: '2/26',
+        tierProgress: 15.0,
+        machineDifficulties: [
+          { name: 'Easy', owned_machines: 0, total_machines: 165, completion_percentage: 0 },
+          { name: 'Medium', owned_machines: 1, total_machines: 196, completion_percentage: 0.51 },
+          { name: 'Hard', owned_machines: 0, total_machines: 124, completion_percentage: 0 },
+          { name: 'Insane', owned_machines: 0, total_machines: 70, completion_percentage: 0 }
+        ],
+        recentActivity: season12Activity.length > 0 ? season12Activity : MOCK_SEASONS[0].recentActivity,
+      },
+      {
+        ...MOCK_SEASONS[1], // Season 11
+        seasonalRank: season11Rank,
+        ownsUser: 14,
+        ownsRoot: 14,
+        points: 375,
         flags: '14/26',
         tierProgress: 50,
-        machineDifficulties: machineDifficulties || MOCK_SEASONS[0].machineDifficulties,
-        recentActivity: recentActivity || MOCK_SEASONS[0].recentActivity,
+        machineDifficulties: MOCK_SEASONS[1].machineDifficulties,
+        recentActivity: season11Activity.length > 0 ? season11Activity : MOCK_SEASONS[1].recentActivity,
       },
-      MOCK_SEASONS[1],
-      MOCK_SEASONS[2]
+      MOCK_SEASONS[2], // Season 10
+      MOCK_SEASONS[3]  // Season 9
     ];
 
     const mappedData: MappedHtbStats = {
-      rank: p.ranking ? `#${p.ranking.toLocaleString()}` : '#805',
+      rank: p.ranking ? `#${p.ranking.toLocaleString()}` : '#706',
       rankPoints: pointsVal,
-      currentSeasonRank: seasonRankStr,
+      currentSeasonRank: season12Rank,
       totalXP: pointsVal,
       level: p.level || 59,
       levelXP: p.level_xp || 79,
       levelMaxXP: p.next_level_xp || 1743,
-      htbRankTitle: p.rank || 'Professional',
+      htbRankTitle: p.rank || 'Pro Hacker',
       grade: 3,
       ownsUser: userOwnsTotal,
       ownsRoot: systemOwnsTotal,
@@ -346,8 +408,8 @@ export async function GET(request: NextRequest) {
       countryName: p.country_name || 'India',
       isMock: false,
       seasons,
-      machineDifficulties,
-      recentActivity
+      machineDifficulties: machineDifficulties || MOCK_SEASONS[0].machineDifficulties,
+      recentActivity: season12Activity.length > 0 ? season12Activity : MOCK_SEASONS[0].recentActivity
     };
 
     cache = {

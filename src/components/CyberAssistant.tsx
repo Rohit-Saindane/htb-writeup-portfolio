@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 
 function PrismIcon({
-  className = "w-8 h-8",
+  className = "w-10 h-7",
   activeColor = "#00e599",
   animated = true,
 }: {
@@ -40,194 +40,360 @@ function PrismIcon({
 }) {
   return (
     <svg
-      viewBox="0 0 36 36"
+      viewBox="0 0 52 36"
       className={className}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        <linearGradient
-          id="prismGlassGrad"
-          x1="8"
-          y1="5"
-          x2="28"
-          y2="29"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
-          <stop offset="40%" stopColor="#38bdf8" stopOpacity="0.2" />
-          <stop offset="100%" stopColor={activeColor} stopOpacity="0.35" />
-        </linearGradient>
-
-        <filter id="prismSoftGlow" x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="0.6" result="blur" />
+        {/* Optical Soft Glow Filters */}
+        <filter id="prismWhiteLaserGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        <filter id="prismSpectralGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="0.8" result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
 
+        {/* Polished Glass Crystal Gradient */}
+        <linearGradient id="prismGlassCrystalGrad" x1="12" y1="6" x2="32" y2="30" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.28" />
+          <stop offset="35%" stopColor="#38bdf8" stopOpacity="0.14" />
+          <stop offset="70%" stopColor={activeColor} stopOpacity="0.12" />
+          <stop offset="100%" stopColor="#a855f7" stopOpacity="0.22" />
+        </linearGradient>
+
+        {/* Internal Refraction Dispersion Cone Gradient */}
+        <linearGradient id="prismDispersionCone" x1="16.6" y1="19" x2="28" y2="19" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />
+          <stop offset="45%" stopColor="#38bdf8" stopOpacity="0.45" />
+          <stop offset="100%" stopColor="#a855f7" stopOpacity="0.12" />
+        </linearGradient>
+
         {animated && (
           <style>{`
-            @keyframes prismIncidentRay {
-              0% { stroke-dashoffset: 14; opacity: 0; }
-              8% { opacity: 1; }
-              28%, 82% { stroke-dashoffset: 0; opacity: 1; }
-              94%, 100% { stroke-dashoffset: 0; opacity: 0.25; }
+            /* 1. Continuous High-Velocity Incident Photon Stream */
+            @keyframes laserIncomingPhoton {
+              from { stroke-dashoffset: 24; }
+              to { stroke-dashoffset: 0; }
             }
-            @keyframes prismInternalGlow {
-              0%, 18% { opacity: 0; stroke-dashoffset: 8; }
-              32%, 82% { opacity: 0.9; stroke-dashoffset: 0; }
-              94%, 100% { opacity: 0.2; }
+            .p-flow-incoming {
+              stroke-dasharray: 4 4;
+              animation: laserIncomingPhoton 0.8s linear infinite;
             }
-            @keyframes prismPulseAnim {
-              0%, 20% { filter: drop-shadow(0 0 0px transparent); }
-              35% { filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.75)); }
-              55%, 82% { filter: drop-shadow(0 0 3px rgba(0, 229, 153, 0.45)); }
-              94%, 100% { filter: drop-shadow(0 0 0px transparent); }
+
+            /* 2. Refraction Entry Impact Pulse */
+            @keyframes laserImpactSparkle {
+              0%, 100% { r: 2.0; opacity: 0.9; }
+              50% { r: 2.8; opacity: 1; filter: drop-shadow(0 0 5px #ffffff); }
             }
-            @keyframes prismSpectrumRay {
-              0%, 24% { stroke-dashoffset: 18; opacity: 0; }
-              44%, 82% { stroke-dashoffset: 0; opacity: 1; }
-              94%, 100% { stroke-dashoffset: 0; opacity: 0.25; }
+            .p-pulse-impact {
+              animation: laserImpactSparkle 1.2s ease-in-out infinite;
             }
-            .p-anim-incident {
-              stroke-dasharray: 14;
-              stroke-dashoffset: 14;
-              animation: prismIncidentRay 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+
+            /* 3. Internal Crystal Resonance Pulse */
+            @keyframes crystalResonance {
+              0%, 100% { opacity: 0.82; transform: scale(1); }
+              50% { opacity: 1; transform: scale(1.02); filter: drop-shadow(0 0 7px rgba(56, 189, 248, 0.45)); }
             }
-            .p-anim-internal {
-              stroke-dasharray: 8;
-              stroke-dashoffset: 8;
-              animation: prismInternalGlow 3.6s ease-in-out infinite;
+            .p-anim-crystal-body {
+              transform-origin: 22px 19px;
+              animation: crystalResonance 2.2s ease-in-out infinite;
             }
-            .p-anim-glass {
-              animation: prismPulseAnim 3.6s ease-in-out infinite;
+
+            /* 4. High-Speed Outgoing Spectral Rays Flow */
+            @keyframes laserOutgoingFlow {
+              from { stroke-dashoffset: 28; }
+              to { stroke-dashoffset: 0; }
             }
-            .p-anim-r1 {
-              stroke-dasharray: 18; stroke-dashoffset: 18;
-              animation: prismSpectrumRay 3.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-              animation-delay: 0.04s;
+            .p-flow-ray {
+              stroke-dasharray: 5 4;
+              animation: laserOutgoingFlow 0.85s linear infinite;
             }
-            .p-anim-r2 {
-              stroke-dasharray: 18; stroke-dashoffset: 18;
-              animation: prismSpectrumRay 3.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-              animation-delay: 0.08s;
+            .p-flow-r1 { animation-delay: 0.0s; }
+            .p-flow-r2 { animation-delay: 0.14s; }
+            .p-flow-r3 { animation-delay: 0.28s; }
+            .p-flow-r4 { animation-delay: 0.42s; }
+            .p-flow-r5 { animation-delay: 0.56s; }
+            .p-flow-r6 { animation-delay: 0.70s; }
+
+            /* 5. Spectral Intensity Breathing */
+            @keyframes rayGlowBreathing {
+              0%, 100% { opacity: 0.88; }
+              50% { opacity: 1; filter: drop-shadow(0 0 3px currentColor); }
             }
-            .p-anim-r3 {
-              stroke-dasharray: 18; stroke-dashoffset: 18;
-              animation: prismSpectrumRay 3.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-              animation-delay: 0.12s;
-            }
-            .p-anim-r4 {
-              stroke-dasharray: 18; stroke-dashoffset: 18;
-              animation: prismSpectrumRay 3.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-              animation-delay: 0.16s;
-            }
-            .p-anim-r5 {
-              stroke-dasharray: 18; stroke-dashoffset: 18;
-              animation: prismSpectrumRay 3.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-              animation-delay: 0.20s;
-            }
-            .p-anim-r6 {
-              stroke-dasharray: 18; stroke-dashoffset: 18;
-              animation: prismSpectrumRay 3.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-              animation-delay: 0.24s;
+            .p-pulse-spectral {
+              animation: rayGlowBreathing 1.8s ease-in-out infinite;
             }
           `}</style>
         )}
       </defs>
 
-      {/* Incident White Light Beam entering from left (1 writeup) */}
-      <path
-        d="M2 18L13 18"
+      {/* 1. PERMANENTLY VISIBLE INCIDENT WHITE LASER (Left Edge -> Glass Face) */}
+      {/* Ambient under-glow line */}
+      <line
+        x1="2"
+        y1="19"
+        x2="16.6"
+        y2="19"
         stroke="#ffffff"
-        strokeWidth="2.2"
+        strokeWidth="3.2"
         strokeLinecap="round"
-        className={animated ? "p-anim-incident" : "opacity-95"}
-        filter="url(#prismSoftGlow)"
+        opacity="0.45"
+        filter="url(#prismWhiteLaserGlow)"
       />
-
-      {/* Internal Beam bending through the glass */}
-      <path
-        d="M13 18L21 18"
+      {/* Core high-intensity white beam (never fades, 100% solid) */}
+      <line
+        x1="2"
+        y1="19"
+        x2="16.6"
+        y2="19"
         stroke="#ffffff"
-        strokeWidth="1.4"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        opacity="0.95"
+      />
+      {/* Animated high-velocity photon particle stream */}
+      {animated && (
+        <line
+          x1="2"
+          y1="19"
+          x2="16.6"
+          y2="19"
+          stroke="#ffffff"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          className="p-flow-incoming"
+          opacity="0.9"
+        />
+      )}
+
+      {/* 2. INTERNAL REFRACTION DISPERSION CONE (Inside Glass Crystal) */}
+      <polygon
+        points="16.6,19 25.8,15 29.8,25"
+        fill="url(#prismDispersionCone)"
+        opacity="0.65"
+      />
+      <line
+        x1="16.6"
+        y1="19"
+        x2="27.4"
+        y2="19"
+        stroke="#ffffff"
+        strokeWidth="1.2"
         strokeDasharray="1.5 1.5"
-        className={animated ? "p-anim-internal" : "opacity-75"}
+        opacity="0.75"
       />
 
-      {/* Triangular Prism Glass Body */}
-      <g className={animated ? "p-anim-glass" : undefined}>
+      {/* 3. TRIANGULAR PRISM GLASS BODY */}
+      <g className={animated ? "p-anim-crystal-body" : undefined}>
         <polygon
-          points="18,5 8,29 28,29"
-          fill="url(#prismGlassGrad)"
-          stroke="rgba(255,255,255,0.85)"
-          strokeWidth="1.4"
+          points="22,6 12,30 32,30"
+          fill="url(#prismGlassCrystalGrad)"
+          stroke="rgba(255, 255, 255, 0.9)"
+          strokeWidth="1.3"
           strokeLinejoin="round"
         />
+        {/* Specular Facet Ridge Highlights */}
         <line
-          x1="18"
-          y1="5"
-          x2="18"
-          y2="29"
-          stroke="rgba(255,255,255,0.25)"
+          x1="22"
+          y1="6"
+          x2="22"
+          y2="30"
+          stroke="rgba(255, 255, 255, 0.3)"
           strokeWidth="0.8"
+        />
+        <line
+          x1="22"
+          y1="6"
+          x2="12"
+          y2="30"
+          stroke="#ffffff"
+          strokeWidth="1.1"
+          opacity="0.75"
         />
       </g>
 
-      {/* 6 Refracted Spectrum Rays (Red, Orange, Yellow, Emerald, Blue, Purple) */}
+      {/* 4. REFRACTION ENTRY IMPACT NODE (Visible sparkle at the entry point) */}
+      <circle
+        cx="16.6"
+        cy="19"
+        r="2.2"
+        fill="#ffffff"
+        className={animated ? "p-pulse-impact" : undefined}
+      />
+      <circle
+        cx="16.6"
+        cy="19"
+        r="4.2"
+        fill="#38bdf8"
+        opacity="0.4"
+        filter="url(#prismWhiteLaserGlow)"
+      />
+
+      {/* 5. 6 REFRACTED SPECTRUM RAYS (Solid Core + Animated Photon Stream) */}
       {/* 1. Red (Attack) */}
-      <path
-        d="M22 14L34 7"
-        stroke="#ef4444"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        className={animated ? "p-anim-r1" : undefined}
-        filter="url(#prismSoftGlow)"
-      />
+      <g className={animated ? "p-pulse-spectral" : undefined} style={{ color: "#ff3366" }}>
+        <line
+          x1="25.8"
+          y1="15"
+          x2="50"
+          y2="7.5"
+          stroke="#ff3366"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          filter="url(#prismSpectralGlow)"
+        />
+        {animated && (
+          <line
+            x1="25.8"
+            y1="15"
+            x2="50"
+            y2="7.5"
+            stroke="#ffffff"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            className="p-flow-ray p-flow-r1"
+            opacity="0.85"
+          />
+        )}
+      </g>
+
       {/* 2. Orange */}
-      <path
-        d="M22.8 15.5L34.8 11"
-        stroke="#f97316"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        className={animated ? "p-anim-r2" : undefined}
-        filter="url(#prismSoftGlow)"
-      />
+      <g className={animated ? "p-pulse-spectral" : undefined} style={{ color: "#ff8800", animationDelay: "0.2s" }}>
+        <line
+          x1="26.6"
+          y1="17"
+          x2="51"
+          y2="12"
+          stroke="#ff8800"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          filter="url(#prismSpectralGlow)"
+        />
+        {animated && (
+          <line
+            x1="26.6"
+            y1="17"
+            x2="51"
+            y2="12"
+            stroke="#ffffff"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            className="p-flow-ray p-flow-r2"
+            opacity="0.85"
+          />
+        )}
+      </g>
+
       {/* 3. Yellow (Debug) */}
-      <path
-        d="M23.2 17L35.2 15"
-        stroke="#eab308"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        className={animated ? "p-anim-r3" : undefined}
-        filter="url(#prismSoftGlow)"
-      />
+      <g className={animated ? "p-pulse-spectral" : undefined} style={{ color: "#ffd000", animationDelay: "0.4s" }}>
+        <line
+          x1="27.4"
+          y1="19"
+          x2="52"
+          y2="16.5"
+          stroke="#ffd000"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          filter="url(#prismSpectralGlow)"
+        />
+        {animated && (
+          <line
+            x1="27.4"
+            y1="19"
+            x2="52"
+            y2="16.5"
+            stroke="#ffffff"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            className="p-flow-ray p-flow-r3"
+            opacity="0.85"
+          />
+        )}
+      </g>
+
       {/* 4. Emerald (General) */}
-      <path
-        d="M23.2 18.5L35.2 19"
-        stroke="#00e599"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        className={animated ? "p-anim-r4" : undefined}
-        filter="url(#prismSoftGlow)"
-      />
+      <g className={animated ? "p-pulse-spectral" : undefined} style={{ color: "#00e599", animationDelay: "0.6s" }}>
+        <line
+          x1="28.2"
+          y1="21"
+          x2="52"
+          y2="21.5"
+          stroke="#00e599"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          filter="url(#prismSpectralGlow)"
+        />
+        {animated && (
+          <line
+            x1="28.2"
+            y1="21"
+            x2="52"
+            y2="21.5"
+            stroke="#ffffff"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            className="p-flow-ray p-flow-r4"
+            opacity="0.85"
+          />
+        )}
+      </g>
+
       {/* 5. Blue (Defense) */}
-      <path
-        d="M22.8 20L34.8 23"
-        stroke="#3b82f6"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        className={animated ? "p-anim-r5" : undefined}
-        filter="url(#prismSoftGlow)"
-      />
+      <g className={animated ? "p-pulse-spectral" : undefined} style={{ color: "#38bdf8", animationDelay: "0.8s" }}>
+        <line
+          x1="29.0"
+          y1="23"
+          x2="51"
+          y2="26"
+          stroke="#38bdf8"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          filter="url(#prismSpectralGlow)"
+        />
+        {animated && (
+          <line
+            x1="29.0"
+            y1="23"
+            x2="51"
+            y2="26"
+            stroke="#ffffff"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            className="p-flow-ray p-flow-r5"
+            opacity="0.85"
+          />
+        )}
+      </g>
+
       {/* 6. Purple (Tools) */}
-      <path
-        d="M22 21.5L34 27.5"
-        stroke="#a855f7"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        className={animated ? "p-anim-r6" : undefined}
-        filter="url(#prismSoftGlow)"
-      />
+      <g className={animated ? "p-pulse-spectral" : undefined} style={{ color: "#a855f7", animationDelay: "1.0s" }}>
+        <line
+          x1="29.8"
+          y1="25"
+          x2="50"
+          y2="30.5"
+          stroke="#a855f7"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          filter="url(#prismSpectralGlow)"
+        />
+        {animated && (
+          <line
+            x1="29.8"
+            y1="25"
+            x2="50"
+            y2="30.5"
+            stroke="#ffffff"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            className="p-flow-ray p-flow-r6"
+            opacity="0.85"
+          />
+        )}
+      </g>
     </svg>
   );
 }
@@ -902,7 +1068,7 @@ export default function CyberAssistant() {
             aria-label="Open Prism AI"
           >
             <PrismIcon
-              className="w-8 h-8 sm:w-9 sm:h-9 transition-transform duration-300 group-hover:scale-110"
+              className="w-10 h-7 sm:w-11 sm:h-8 transition-transform duration-300 group-hover:scale-110"
               activeColor={activeModeMeta.hexColor}
             />
           </button>
@@ -993,8 +1159,8 @@ export default function CyberAssistant() {
                 </span>
 
                 <div className="flex items-center gap-2 text-muted-foreground dark:text-[#8a93a1]">
-                  <div className="relative flex items-center justify-center p-1 rounded bg-black/30 border border-white/10">
-                    <PrismIcon className="w-3.5 h-3.5" activeColor={activeModeMeta.hexColor} animated={false} />
+                  <div className="relative flex items-center justify-center px-1 py-0.5 rounded bg-black/30 border border-white/10">
+                    <PrismIcon className="w-5 h-3.5" activeColor={activeModeMeta.hexColor} animated={false} />
                   </div>
                   <span className="font-semibold text-foreground dark:text-[#e4e7eb]">prism</span>
                   <span className="text-[10px] px-1.5 py-0.2 rounded bg-muted/30 dark:bg-[#161b22] text-muted-foreground border border-border dark:border-[#20242b]">
