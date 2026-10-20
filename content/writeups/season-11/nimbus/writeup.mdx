@@ -752,22 +752,30 @@ connect to [10.10.14.70] from (UNKNOWN) [10.129.38.159] 42452
 
 Container escaped and host root flag retrieved!
 
+> 🎯 **Final Takeaways & Real Talk:**  
+> Nimbus is easily one of the most rewarding and technically rich cloud security machines of Season 11! While HackTheBox rates it as "Hard", under the hood the complete chain—spanning SSRF filter bypasses with octal IP representations, IAM credential harvesting, SQS worker reverse shells, and container breakouts via OverlayFS upperdir discovery and `/proc/sys/kernel/modprobe` overwrite—feels thoroughly realistic and deeply satisfying. I documented every single enumeration command, architectural insight, and exploit step so that anyone walking through it understands the underlying cloud and kernel mechanisms. Hope you enjoyed this writeup. Happy Hacking!
+
 ---
 
-## Mitigations & Security Perspective
+## Step 5 - Mitigations & Defensive Hardening
 
-### 🔴 AWS Metadata Service Security (SSRF & Octal Bypass)
-- **Root Cause:** Reliance on IMDSv1 allowed server-side request forgery (SSRF) without token authentication. The URL filter failed to normalize IP addresses before validation, allowing octal encoding (`0251.0376.0251.0376`) to bypass IP checks.
-- **Remediation:** Enforce **IMDSv2** (`HttpTokens=required`) requiring session token headers (`X-aws-ec2-metadata-token`). Normalize and resolve domain names and IP representations before enforcing security policies, or block the metadata subnet (`169.254.169.254/32`) at the network firewall / routing layer.
+To remediate the vulnerabilities identified across the Nimbus environment, administrators and cloud architects should apply defense-in-depth hardening across application, CI/CD, and host kernel layers:
 
-### 🔴 PyYAML Insecure Deserialization (`yaml.load`)
-- **Root Cause:** Background worker utilized Python's unrestricted `yaml.load(body, Loader=yaml.Loader)` constructor to process untrusted SQS message bodies, leading to arbitrary command execution.
-- **Remediation:** Always use `yaml.safe_load(body)` or `yaml.load(body, Loader=yaml.SafeLoader)` when handling untrusted data.
+### 1. AWS Instance Metadata Service (IMDSv2) Enforcement & SSRF Defense
+- **Enforce IMDSv2 Globally:** Mandate IMDSv2 (`HttpTokens=required`) across all EC2 instances and container hosts. This requires attackers to issue a `PUT` request with `X-aws-ec2-metadata-token-ttl-seconds` to acquire a session token, defeating blind SSRF.
+- **Normalize and Canonicalize Network Inputs:** When validating user-supplied URLs or IP addresses, resolve all representations (including octal `0251.0376.0251.0376`, hex, or integer IP formats) before checking against blacklists.
+- **Network-Level Metadata Blocking:** Implement local firewall rules or iptables chains prohibiting non-root container processes from routing to the link-local metadata address (`169.254.169.254/32`).
 
-### 🔴 Overprivileged CI/CD Containers (`privilegedMode: true`)
-- **Root Cause:** Permitting `privilegedMode: true` in AWS CodeBuild granted containers full Linux kernel capabilities (`CAP_SYS_ADMIN`), bypassing Docker isolation boundaries.
-- **Remediation:** Prohibit privileged mode in build pipeline policies. Run build agents with least-privilege service roles and drop all unnecessary Linux capabilities.
+### 2. Secure Serialization & PyYAML SafeLoader Enforcement
+- **Eliminate Unrestricted Constructors:** Replace all occurrences of `yaml.load(body, Loader=yaml.Loader)` with `yaml.safe_load(body)` or `yaml.load(body, Loader=yaml.SafeLoader)` across all background workers, microservices, and queue consumers.
+- **Input Schema Validation:** Strictly validate and sanitize message schemas before executing any subprocess or script evaluation. Never pass unvetted strings directly to `subprocess.run(["python3", "-c", ...])`.
 
-### 🔴 Writable `/proc/sys` inside Containers
-- **Root Cause:** Mounting `/proc/sys` with write permissions allows container processes to overwrite host kernel parameters such as `/proc/sys/kernel/modprobe`.
-- **Remediation:** Ensure `/proc/sys` is strictly mounted read-only and enforce SELinux, AppArmor, or Seccomp profiles prohibiting user mode helper modifications.
+### 3. CI/CD Pipeline Least Privilege & Container Sandbox Isolation
+- **Disable Privileged Mode:** Disallow `privilegedMode: true` in AWS CodeBuild and local runner profiles. Running build tasks in privileged containers drops Docker boundary isolation and confers full `CAP_SYS_ADMIN` privileges.
+- **Enforce IAM Role Scoping:** Restrict IAM permissions attached to CI/CD service roles (`arn:aws:iam::...:role/codebuild-role`). Worker daemons should only possess permissions necessary for their immediate task, preventing unauthorized build execution.
+- **Ephemeral Non-Root Runners:** Execute all CI/CD build scripts as non-root users inside unprivileged ephemeral containers with drop-capabilities enabled (`--cap-drop=ALL`).
+
+### 4. Linux Kernel Parameter Hardening & /proc/sys Protection
+- **Mount /proc/sys as Read-Only:** Ensure that `/proc/sys` is mounted strictly read-only inside all container environments. Non-privileged container runtimes enforce this by default; never override it with custom volume mounts.
+- **Kernel User Mode Helper Auditing:** Deploy Linux kernel auditing rules (`auditd`) to monitor write attempts to `/proc/sys/kernel/modprobe` and alert on unauthorized binary execution via `call_usermodehelper`.
+- **LSM & AppArmor Profiles:** Deploy enforcing AppArmor or SELinux profiles that prevent container processes from altering kernel parameters or accessing host filesystem paths via OverlayFS layers.
