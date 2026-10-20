@@ -342,46 +342,24 @@ rootbash-5.2# ls
 root.txt
 ```
 
-- 🔍 *Done!!*
+Root flag captured and system fully compromised!
+
+> 🎯 **Final Takeaways & Real Talk:**  
+> Reactor is a fast-paced, high-impact machine exploring modern JavaScript and Node.js security pitfalls! The entry point highlights how bleeding-edge framework features like React Server Components (RSC) in Next.js 15 can introduce severe unauthenticated deserialization vectors when action wire protocols are mishandled. On the host, auditing internal listening ports immediately surfaces the Node.js V8 inspector protocol on port 9229, demonstrating how development debugging flags left running under root can turn a low-privileged foothold into an instant, trivial root shell via `child_process.execSync`. Happy Hacking!
 
 ---
 
-## Mitigations & Security Perspective
+## Step 5 - Mitigations & Defensive Hardening
 
-> [!IMPORTANT]
-> **🛡️ Blue Team Security Assessment Blueprint**
-> Below is the post-exploitation blueprint analyzing every vulnerability and administrative configuration issue exploited in the Reactor system. Each identified weakness is mapped to its core risk, threat context, and practical defensive remediation strategies.
+To remediate the vulnerabilities identified across the Reactor system, administrators and developers should apply defense-in-depth controls across web application frameworks and Node.js process runtime configurations:
 
-### 🔴 Next.js React Server Components Unsafe Deserialization (CVE-2025-55182 / CVE-2025-66478)
+### 1. Next.js React Server Components Unsafe Deserialization (CVE-2025-55182 / CVE-2025-66478)
+- **Upgrade Next.js Framework:** Upgrade Next.js to version ≥15.0.4 or the latest LTS release where strict validation of React Server Components wire payloads and action identifiers is enforced.
+- **Run Inside Unprivileged Sandboxes:** Execute Next.js applications inside non-root container runtimes with read-only root filesystems (`readOnlyRootFilesystem: true`) to prevent arbitrary binary compilation and payload staging in `/tmp`.
+- **Monitor RSC Flight Payloads:** Implement Web Application Firewall (WAF) rules inspecting request headers and bodies for anomalous `RSC` or `Next-Action` parameters attempting to pass serialized command pipes.
 
-> [!WARNING]
-> **Vulnerability Profile:**
-> Next.js version 15.0.3 failed to sanitize untrusted serialized data passed across the React Server Components wire protocol, allowing unauthenticated attackers to trigger remote code execution via forged RSC action requests.
+### 2. Insecure Node.js / V8 Inspector Protocol Exposure (Port 9229)
+- **Disable Debug Flags in Production:** Never deploy Node.js production daemons with the `--inspect` or `--inspect-brk` flag enabled. Debugging and profiling flags must be strictly limited to isolated local development environments.
+- **Restrict Profiling Interfaces:** If live process profiling or diagnostic inspection is required in production, attach via local Unix domain sockets protected with strict POSIX permissions (`chmod 0600`) restricted solely to the application user.
+- **Kernel Auditing on SUID Spawns:** Deploy Linux audit rules (`auditd`) to detect and alert whenever `node` or `v8` processes spawn `/bin/bash` with elevated privilege preservation arguments (`-p`).
 
-> [!CAUTION]
-> **Risk & Downstream Threat Impact:**
-> Unauthenticated RCE allows immediate code execution inside the Node.js application container, giving attackers access to local application databases (`reactor.db`), environment secrets, and internal network pivots.
-
-> [!TIP]
-> **Defensive Remediation & Detection Strategies:**
-> - **Remediation:** Upgrade Next.js to version 15.0.4 or newer, where strict validation of RSC flight payloads and action IDs is enforced.
-> - **Remediation:** Run web applications inside minimal unprivileged container contexts with read-only root filesystems (`readOnlyRootFilesystem: true`) to impede payload staging in `/tmp`.
-> - **Detection:** Monitor HTTP request headers for anomalous `RSC` or `Next-Action` parameters containing nested shell commands or serialized pipe syntax.
-
----
-
-### 🟡 Insecure Node.js / V8 Inspector Protocol Exposure (Port 9229)
-
-> [!WARNING]
-> **Vulnerability Profile:**
-> A root-privileged Node.js daemon was spawned with the `--inspect` flag listening on `127.0.0.1:9229` without token authentication or mutual TLS.
-
-> [!CAUTION]
-> **Risk & Downstream Threat Impact:**
-> Any unprivileged local user who discovers port 9229 can attach via `node inspect` and invoke `child_process.execSync()` under the high-privilege parent user context, directly bypassing all operating system access controls.
-
-> [!TIP]
-> **Defensive Remediation & Detection Strategies:**
-> - **Remediation:** Never run production services with the `--inspect` or `--inspect-brk` flag enabled. Limit debugging flags strictly to local development sandboxes.
-> - **Remediation:** If profiling is required in production, restrict attachment via Unix domain sockets with strict filesystem ACLs (`chmod 600`) owned solely by the running user.
-> - **Detection:** Deploy Linux audit rules (`auditd`) to alert whenever `node` or `v8` processes spawn `/bin/bash` with SUID arguments (`-p`).

